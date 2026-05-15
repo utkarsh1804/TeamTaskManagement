@@ -3,7 +3,7 @@ const express = require("express");
 const validate = require("../middleware/validate.middleware");
 const authMiddleware = require("../middleware/auth.middleware");
 const { requireGlobalAdmin } = require("../middleware/role.middleware");
-const { adminRequestSchema, inviteLinkSchema } = require("../lib/schemas");
+const { adminRequestSchema, inviteLinkSchema, emailInviteSchema } = require("../lib/schemas");
 const {
   requestAdmin,
   listAdminRequests,
@@ -11,8 +11,12 @@ const {
   rejectAdminRequest,
   generateInviteLink,
   acceptInviteLink,
+  emailInvite,
   listAllUsers,
   addMembersToProject,
+  getMemberDetails,
+  moveMemberToProject,
+  removeMemberFromProject,
 } = require("../controllers/admin.controller");
 
 const router = express.Router();
@@ -40,6 +44,13 @@ router.post(
   generateInviteLink
 );
 router.post("/invites/:token", authMiddleware, acceptInviteLink);
+router.post(
+  "/projects/:id/email-invite",
+  authMiddleware,
+  requireGlobalAdmin,
+  validate(emailInviteSchema),
+  emailInvite
+);
 router.get("/users", authMiddleware, requireGlobalAdmin, listAllUsers);
 router.get("/users/:userId", authMiddleware, requireGlobalAdmin, getMemberDetails);
 router.post(

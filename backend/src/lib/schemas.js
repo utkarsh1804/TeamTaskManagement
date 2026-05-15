@@ -59,6 +59,11 @@ const inviteLinkSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER"]).optional(),
 });
 
+const emailInviteSchema = z.object({
+  email: z.string().email("Invalid email"),
+  role: z.enum(["ADMIN", "MEMBER"]).optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -71,4 +76,5 @@ module.exports = {
   taskStatusSchema,
   adminRequestSchema,
   inviteLinkSchema,
+  emailInviteSchema,
 };

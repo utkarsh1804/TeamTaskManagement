@@ -491,6 +491,104 @@ const removeMemberFromProject = async (req, res, next) => {
   }
 };
 
+const emailInvite = async (req, res, next) => {
+  try {
+    const projectId = req.params.id;
+    const { email, role } = req.body;
+    const memberRole = role || "MEMBER";
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Project not found", code: "NOT_FOUND" });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+
+    if (existingUser) {
+      const existing = await prisma.projectMember.findUnique({
+        where: { userId_projectId: { userId: existingUser.id, projectId } },
+      });
+      if (existing) {
+        return res
+          .status(409)
+          .json({ success: false, error: "User is already a member", code: "ALREADY_MEMBER" });
+      }
+
+      await prisma.projectMember.create({
+        data: { projectId, userId: existingUser.id, role: memberRole },
+        skipDuplicates: true,
+      });
+
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+        await resend.emails.send({
+          from: "TeamTask <onboarding@resend.dev>",
+          to: email,
+          subject: `You've been added to ${project.name}`,
+          html: `<p>Hi ${existingUser.name},</p><p>You've been added to the project <strong>${project.name}</strong> on TeamTask.</p><p>Log in to get started: <a href="${frontendUrl}">${frontendUrl}</a></p>`,
+        });
+      } catch {}
+
+      return res.json({ success: true, message: "User added to project", wasExisting: true });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.inviteLink.create({
+      data: { token, projectId, email, role: memberRole, expiresAt },
+    });
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const link = `${frontendUrl}/invite/${token}`;
+
+    try {
+      const { Resend } = await import("resend");
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      await resend.emails.send({
+        from: "TeamTask <onboarding@resend.dev>",
+        to: email,
+        subject: `You're invited to join ${project.name}`,
+        html: `<p>You've been invited to join the project <strong>${project.name}</strong> on TeamTask.</p><p>Click below to accept:</p><p><a href="${link}" style="display:inline-block;padding:10px 20px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;">Accept Invite</a></p><p>Or copy this link: ${link}</p><p>This invite expires in 7 days.</p>`,
+      });
+    } catch {}
+
+    return res.json({ success: true, message: "Invite email sent", wasExisting: false, link });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const autoAcceptPendingInvites = async (userId, email) => {
+  const pendingInvites = await prisma.inviteLink.findMany({
+    where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+  });
+
+  if (pendingInvites.length === 0) return;
+
+  for (const invite of pendingInvites) {
+    const existing = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId, projectId: invite.projectId } },
+    });
+
+    if (!existing) {
+      await prisma.projectMember.create({
+        data: { projectId: invite.projectId, userId, role: invite.role },
+        skipDuplicates: true,
+      });
+    }
+
+    await prisma.inviteLink.update({
+      where: { id: invite.id },
+      data: { usedAt: new Date() },
+    });
+  }
+};
+
 module.exports = {
   requestAdmin,
   listAdminRequests,
@@ -498,6 +596,8 @@ module.exports = {
   rejectAdminRequest,
   generateInviteLink,
   acceptInviteLink,
+  emailInvite,
+  autoAcceptPendingInvites,
   listAllUsers,
   addMembersToProject,
   getMemberDetails,

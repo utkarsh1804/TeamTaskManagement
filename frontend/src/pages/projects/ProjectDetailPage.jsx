@@ -26,6 +26,7 @@ const ProjectDetailPage = () => {
   const queryClient = useQueryClient();
   const [invite, setInvite] = useState({ email: "", role: "MEMBER" });
   const [inviteError, setInviteError] = useState("");
+  const [inviteMsg, setInviteMsg] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [linkRole, setLinkRole] = useState("MEMBER");
   const [searchTerm, setSearchTerm] = useState("");
@@ -112,12 +113,14 @@ const ProjectDetailPage = () => {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: (payload) => api.post(`/projects/${id}/members`, payload),
-    onSuccess: () => {
+    mutationFn: (payload) => api.post(`/admin/projects/${id}/email-invite`, payload),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       setInvite({ email: "", role: "MEMBER" });
       setInviteError("");
+      setInviteMsg(res.data.message);
+      setTimeout(() => setInviteMsg(""), 4000);
     },
     onError: (err) => {
       setInviteError(err?.response?.data?.error || "Unable to invite member");
@@ -399,6 +402,9 @@ const ProjectDetailPage = () => {
                   </select>
                   {inviteError && (
                     <p className="text-xs text-destructive">{inviteError}</p>
+                  )}
+                  {inviteMsg && (
+                    <p className="text-xs text-green-600">{inviteMsg}</p>
                   )}
                   <Button type="submit" disabled={inviteMutation.isPending}>
                     {inviteMutation.isPending ? "Inviting..." : "Send invite"}

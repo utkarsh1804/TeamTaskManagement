@@ -325,6 +325,172 @@ const addMembersToProject = async (req, res, next) => {
   }
 };
 
+const getMemberDetails = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+
+    const member = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        globalRole: true,
+        createdAt: true,
+        memberships: {
+          include: {
+            project: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+              },
+            },
+          },
+        },
+        assignedTasks: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            dueDate: true,
+            projectId: true,
+            project: { select: { id: true, name: true } },
+          },
+          orderBy: { updatedAt: "desc" },
+        },
+        _count: {
+          select: {
+            assignedTasks: true,
+            createdTasks: true,
+            memberships: true,
+          },
+        },
+      },
+    });
+
+    if (!member) {
+      return res
+        .status(404)
+        .json({ success: false, error: "User not found", code: "NOT_FOUND" });
+    }
+
+    const tasksByStatus = {
+      TODO: 0,
+      IN_PROGRESS: 0,
+      IN_REVIEW: 0,
+      DONE: 0,
+    };
+    member.assignedTasks.forEach((t) => {
+      tasksByStatus[t.status] = (tasksByStatus[t.status] || 0) + 1;
+    });
+
+    return res.json({
+      member: {
+        id: member.id,
+        name: member.name,
+        email: member.email,
+        globalRole: member.globalRole,
+        createdAt: member.createdAt,
+        projects: member.memberships.map((m) => ({
+          projectId: m.project.id,
+          projectName: m.project.name,
+          projectStatus: m.project.status,
+          role: m.role,
+          joinedAt: m.joinedAt,
+        })),
+        tasks: member.assignedTasks,
+        taskStats: {
+          total: member._count.assignedTasks,
+          created: member._count.createdTasks,
+          byStatus: tasksByStatus,
+        },
+        projectCount: member._count.memberships,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const moveMemberToProject = async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { fromProjectId, toProjectId, role } = req.body;
+
+    if (!fromProjectId || !toProjectId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "fromProjectId and toProjectId required", code: "INVALID_INPUT" });
+    }
+
+    const membership = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId, projectId: fromProjectId } },
+    });
+
+    if (!membership) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Not a member of source project", code: "NOT_FOUND" });
+    }
+
+    const existing = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId, projectId: toProjectId } },
+    });
+
+    if (existing) {
+      return res
+        .status(409)
+        .json({ success: false, error: "Already a member of target project", code: "CONFLICT" });
+    }
+
+    await prisma.$transaction([
+      prisma.projectMember.delete({ where: { id: membership.id } }),
+      prisma.projectMember.create({
+        data: { userId, projectId: toProjectId, role: role || "MEMBER" },
+      }),
+    ]);
+
+    return res.json({ success: true, message: "Member moved to project" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const removeMemberFromProject = async (req, res, next) => {
+  try {
+    const { userId, projectId } = req.params;
+
+    const membership = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId, projectId } },
+    });
+
+    if (!membership) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Member not found in project", code: "NOT_FOUND" });
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+
+    if (project?.ownerId === userId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Owner cannot be removed", code: "BAD_REQUEST" });
+    }
+
+    await prisma.projectMember.delete({ where: { id: membership.id } });
+
+    return res.json({ success: true, message: "Member removed from project" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   requestAdmin,
   listAdminRequests,
@@ -334,4 +500,7 @@ module.exports = {
   acceptInviteLink,
   listAllUsers,
   addMembersToProject,
+  getMemberDetails,
+  moveMemberToProject,
+  removeMemberFromProject,
 };

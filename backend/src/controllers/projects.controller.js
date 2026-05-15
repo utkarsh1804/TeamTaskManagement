@@ -323,9 +323,19 @@ const removeMember = async (req, res, next) => {
     const projectId = req.params.id;
     const userId = req.params.userId;
 
+    const membership = await prisma.projectMember.findUnique({
+      where: { userId_projectId: { userId, projectId } },
+    });
+
+    if (!membership) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Member not found", code: "NOT_FOUND" });
+    }
+
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, name: true, ownerId: true },
+      select: { ownerId: true, name: true },
     });
 
     if (!project) {
@@ -340,27 +350,21 @@ const removeMember = async (req, res, next) => {
         .json({ success: false, error: "Owner cannot be removed", code: "BAD_REQUEST" });
     }
 
-    const membership = await prisma.projectMember.findUnique({
-      where: { userId_projectId: { userId, projectId } },
-      include: { user: { select: userSelect } },
-    });
-
-    if (!membership) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Member not found", code: "NOT_FOUND" });
-    }
-
     await prisma.projectMember.delete({ where: { id: membership.id } });
 
-    const actor = await getActor(req.user.id);
-    await logActivity(
-      `${actor.name} removed ${membership.user.name} from project "${project.name}"`,
-      "ProjectMember",
-      membership.id,
-      actor.id,
-      project.id
-    );
+    getActor(req.user.id).then((actor) => {
+      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }).then((removed) => {
+        if (actor && removed) {
+          logActivity(
+            `${actor.name} removed ${removed.name} from project "${project.name}"`,
+            "ProjectMember",
+            membership.id,
+            req.user.id,
+            projectId
+          );
+        }
+      });
+    });
 
     res.json({ success: true });
   } catch (error) {

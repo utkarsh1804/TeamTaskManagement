@@ -163,7 +163,27 @@ const ProjectDetailPage = () => {
 
   const removeMemberMutation = useMutation({
     mutationFn: (userId) => api.delete(`/projects/${id}/members/${userId}`),
-    onSuccess: () => {
+    onMutate: async (userId) => {
+      await queryClient.cancelQueries({ queryKey: ["project", id] });
+      const previous = queryClient.getQueryData(["project", id]);
+      queryClient.setQueryData(["project", id], (old) => {
+        if (!old?.project) return old;
+        return {
+          ...old,
+          project: {
+            ...old.project,
+            members: old.project.members.filter((m) => m.userId !== userId),
+          },
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _userId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["project", id], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },

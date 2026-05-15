@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const prisma = require("../lib/prisma");
+const { autoAcceptPendingInvites } = require("./admin.controller");
 
 const userSelect = {
   id: true,
@@ -50,6 +51,8 @@ const register = async (req, res, next) => {
     const token = signToken(user);
     res.cookie("token", token, cookieOptions);
 
+    await autoAcceptPendingInvites(user.id, email);
+
     return res.status(201).json({ user, token });
   } catch (error) {
     return next(error);
@@ -89,6 +92,8 @@ const login = async (req, res, next) => {
     const user = await prisma.user.findUnique({ where: { email }, select: userSelect });
     const token = signToken(user);
     res.cookie("token", token, cookieOptions);
+
+    await autoAcceptPendingInvites(user.id, email);
 
     return res.json({ user, token });
   } catch (error) {

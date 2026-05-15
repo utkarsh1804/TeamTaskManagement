@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
@@ -33,10 +33,7 @@ const Topbar = () => {
             className="h-10 w-72 rounded-full border border-input bg-background pl-10 pr-4 text-sm"
           />
         </div>
-        <Button className="gap-2" type="button">
-          <Plus className="h-4 w-4" />
-          New Task
-        </Button>
+
       </div>
     </header>
   );

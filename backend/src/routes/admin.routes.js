@@ -11,7 +11,8 @@ const {
   rejectAdminRequest,
   generateInviteLink,
   acceptInviteLink,
-  bulkAddDemoUsers,
+  listAllUsers,
+  addMembersToProject,
 } = require("../controllers/admin.controller");
 
 const router = express.Router();
@@ -39,11 +40,12 @@ router.post(
   generateInviteLink
 );
 router.post("/invites/:token", authMiddleware, acceptInviteLink);
+router.get("/users", authMiddleware, requireGlobalAdmin, listAllUsers);
 router.post(
-  "/projects/:id/bulk-add-demo-users",
+  "/projects/:id/add-members",
   authMiddleware,
   requireGlobalAdmin,
-  bulkAddDemoUsers
+  addMembersToProject
 );
 
 module.exports = router;

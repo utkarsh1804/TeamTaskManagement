@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
@@ -28,6 +28,7 @@ const AdminLoginPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const setUser = useAuthStore((state) => state.setUser);
 
   const schema = mode === "login" ? loginSchema : requestSchema;
@@ -51,7 +52,7 @@ const AdminLoginPage = () => {
         localStorage.setItem("token", data.token);
       }
       setUser(data.user);
-      navigate("/");
+      navigate(location.state?.from || "/");
     } catch (err) {
       setError(err?.response?.data?.error || "Login failed");
     }

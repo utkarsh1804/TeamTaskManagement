@@ -28,7 +28,9 @@ const ProjectDetailPage = () => {
   const [inviteError, setInviteError] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [linkRole, setLinkRole] = useState("MEMBER");
-  const [demoMsg, setDemoMsg] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [addMsg, setAddMsg] = useState("");
 
   const { data: projectData } = useQuery({
     queryKey: ["project", id],
@@ -46,6 +48,15 @@ const ProjectDetailPage = () => {
     },
   });
 
+  const { data: allUsers } = useQuery({
+    queryKey: ["all-users"],
+    queryFn: async () => {
+      const { data } = await api.get("/admin/users");
+      return data;
+    },
+    enabled: user?.globalRole === "ADMIN",
+  });
+
   const project = projectData?.project;
   const members = project?.members || [];
 
@@ -56,6 +67,18 @@ const ProjectDetailPage = () => {
     const membership = members.find((member) => member.userId === user.id);
     return membership?.role === "ADMIN";
   }, [project, user, members]);
+
+  const memberIds = useMemo(() => new Set(members.map((m) => m.userId)), [members]);
+
+  const filteredUsers = useMemo(() => {
+    if (!allUsers?.items) return [];
+    return allUsers.items.filter(
+      (u) =>
+        !memberIds.has(u.id) &&
+        (u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [allUsers, memberIds, searchTerm]);
 
   const { register, handleSubmit, reset, formState } = useForm({
     resolver: zodResolver(taskSchema),
@@ -74,6 +97,7 @@ const ProjectDetailPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-tasks", id] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       reset();
     },
   });
@@ -91,6 +115,7 @@ const ProjectDetailPage = () => {
     mutationFn: (payload) => api.post(`/projects/${id}/members`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
       setInvite({ email: "", role: "MEMBER" });
       setInviteError("");
     },
@@ -110,11 +135,29 @@ const ProjectDetailPage = () => {
     },
   });
 
+  const addMembersMutation = useMutation({
+    mutationFn: ({ projectId, userIds }) =>
+      api.post(`/admin/projects/${projectId}/add-members`, { userIds }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["all-users"] });
+      setSelectedIds(new Set());
+      setSearchTerm("");
+      setAddMsg(res.data.message);
+      setTimeout(() => setAddMsg(""), 3000);
+    },
+    onError: (err) => {
+      setAddMsg(err?.response?.data?.error || "Failed to add members");
+    },
+  });
+
   const updateRoleMutation = useMutation({
     mutationFn: ({ userId, role }) =>
       api.patch(`/projects/${id}/members/${userId}`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 
@@ -122,6 +165,7 @@ const ProjectDetailPage = () => {
     mutationFn: (userId) => api.delete(`/projects/${id}/members/${userId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
   });
 
@@ -154,17 +198,17 @@ const ProjectDetailPage = () => {
     }
   };
 
-  const bulkDemoMutation = useMutation({
-    mutationFn: (projectId) =>
-      api.post(`/admin/projects/${projectId}/bulk-add-demo-users`),
-    onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-      setDemoMsg(res.data.message);
-    },
-    onError: (err) => {
-      setDemoMsg(err?.response?.data?.error || "Failed to add demo users");
-    },
-  });
+  const toggleUser = (userId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
 
   return (
     <section className="space-y-8">
@@ -288,10 +332,10 @@ const ProjectDetailPage = () => {
                             role: event.target.value,
                           })
                         }
-                        className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                        className="rounded border border-input bg-background px-2 py-1 text-xs"
                       >
-                        <option value="ADMIN">ADMIN</option>
                         <option value="MEMBER">MEMBER</option>
+                        <option value="ADMIN">ADMIN</option>
                       </select>
                       <button
                         type="button"
@@ -382,21 +426,71 @@ const ProjectDetailPage = () => {
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border bg-card p-6">
-                    <h3 className="text-lg font-semibold">Add demo users</h3>
+                    <h3 className="text-lg font-semibold">Add members</h3>
                     <p className="text-sm text-muted-foreground">
-                      Bulk-add 50 demo accounts to this project for task allocation.
+                      Search and select existing users to add to this project.
                     </p>
-                    <Button
-                      type="button"
-                      onClick={() => bulkDemoMutation.mutate(id)}
-                      disabled={bulkDemoMutation.isPending}
-                      className="mt-4 w-full"
-                    >
-                      {bulkDemoMutation.isPending ? "Adding..." : "Add All Demo Users"}
-                    </Button>
-                    {demoMsg && (
-                      <p className="mt-2 text-xs text-muted-foreground">{demoMsg}</p>
-                    )}
+                    <div className="mt-4 space-y-3">
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        placeholder="Search by name or email..."
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      />
+
+                      {filteredUsers.length > 0 && (
+                        <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-border p-2">
+                          {filteredUsers.map((u) => (
+                            <label
+                              key={u.id}
+                              className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted/50"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.has(u.id)}
+                                onChange={() => toggleUser(u.id)}
+                                className="h-4 w-4 rounded border-input"
+                              />
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{u.name}</p>
+                                <p className="text-xs text-muted-foreground">{u.email}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {filteredUsers.length === 0 && searchTerm && (
+                        <p className="text-sm text-muted-foreground">No matching users found.</p>
+                      )}
+
+                      {selectedIds.size > 0 && (
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm text-muted-foreground">
+                            {selectedIds.size} selected
+                          </span>
+                          <Button
+                            type="button"
+                            disabled={addMembersMutation.isPending}
+                            onClick={() =>
+                              addMembersMutation.mutate({
+                                projectId: id,
+                                userIds: Array.from(selectedIds),
+                              })
+                            }
+                          >
+                            {addMembersMutation.isPending
+                              ? "Adding..."
+                              : `Add ${selectedIds.size} Member${selectedIds.size > 1 ? "s" : ""}`}
+                          </Button>
+                        </div>
+                      )}
+
+                      {addMsg && (
+                        <p className="text-xs text-muted-foreground">{addMsg}</p>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

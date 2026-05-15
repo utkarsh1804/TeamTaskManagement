@@ -9,6 +9,7 @@ const InviteAcceptPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
   const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [projectId, setProjectId] = useState(null);
@@ -24,6 +25,10 @@ const InviteAcceptPage = () => {
         const { data } = await api.post(`/admin/invites/${token}`);
         setProjectId(data.projectId);
         setStatus("accepted");
+        const meRes = await api.get("/auth/me");
+        if (meRes.data?.user) {
+          setUser(meRes.data.user);
+        }
       } catch (err) {
         setErrorMsg(err?.response?.data?.error || "Invalid or expired invite.");
         setStatus("error");
@@ -31,7 +36,7 @@ const InviteAcceptPage = () => {
     };
 
     accept();
-  }, [token, user]);
+  }, [token, user, setUser]);
 
   if (status === "loading" && user) {
     return (
@@ -50,8 +55,8 @@ const InviteAcceptPage = () => {
             Sign in or create an account to join the project.
           </p>
           <div className="flex justify-center gap-4">
-            <Button onClick={() => navigate("/login")}>Sign in</Button>
-            <Button variant="outline" onClick={() => navigate("/register")}>
+            <Button onClick={() => navigate("/login", { state: { from: `/invite/${token}` } })}>Sign in</Button>
+            <Button variant="outline" onClick={() => navigate("/register", { state: { from: `/invite/${token}` } })}>
               Register
             </Button>
           </div>

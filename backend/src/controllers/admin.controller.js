@@ -267,9 +267,29 @@ const acceptInviteLink = async (req, res, next) => {
   }
 };
 
-const bulkAddDemoUsers = async (req, res, next) => {
+const listAllUsers = async (req, res, next) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, email: true, globalRole: true },
+      orderBy: { name: "asc" },
+    });
+
+    return res.json({ items: users });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const addMembersToProject = async (req, res, next) => {
   try {
     const projectId = req.params.id;
+    const { userIds } = req.body;
+
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Provide an array of userIds", code: "INVALID_INPUT" });
+    }
 
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) {
@@ -278,31 +298,26 @@ const bulkAddDemoUsers = async (req, res, next) => {
         .json({ success: false, error: "Project not found", code: "NOT_FOUND" });
     }
 
-    const demoUsers = await prisma.user.findMany({
-      where: { email: { endsWith: "@demouser.in" } },
-      select: { id: true },
-    });
-
     const existingMembers = await prisma.projectMember.findMany({
       where: { projectId },
       select: { userId: true },
     });
 
     const existingIds = new Set(existingMembers.map((m) => m.userId));
-    const toAdd = demoUsers.filter((u) => !existingIds.has(u.id));
+    const toAdd = userIds.filter((uid) => !existingIds.has(uid));
 
     if (toAdd.length === 0) {
-      return res.json({ success: true, message: "All demo users already in project", added: 0 });
+      return res.json({ success: true, message: "All users already in project", added: 0 });
     }
 
     await prisma.projectMember.createMany({
-      data: toAdd.map((u) => ({ projectId, userId: u.id, role: "MEMBER" })),
+      data: toAdd.map((userId) => ({ projectId, userId, role: "MEMBER" })),
       skipDuplicates: true,
     });
 
     return res.status(201).json({
       success: true,
-      message: `Added ${toAdd.length} demo users to project`,
+      message: `Added ${toAdd.length} member${toAdd.length > 1 ? "s" : ""} to project`,
       added: toAdd.length,
     });
   } catch (error) {
@@ -317,5 +332,6 @@ module.exports = {
   rejectAdminRequest,
   generateInviteLink,
   acceptInviteLink,
-  bulkAddDemoUsers,
+  listAllUsers,
+  addMembersToProject,
 };

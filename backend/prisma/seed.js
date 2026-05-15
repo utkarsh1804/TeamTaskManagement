@@ -6,17 +6,17 @@ const prisma = new PrismaClient();
 const ADMIN_EMAIL = "admin@teamtask.io";
 const ADMIN_PASSWORD = "Admin@1234";
 
-const demoNames = [
-  "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun",
-  "Sai", "Reyansh", "Ayaan", "Krishna", "Ishaan",
-  "Shaurya", "Ananya", "Diya", "Myra", "Sara",
-  "Aadhya", "Isha", "Kiara", "Riya", "Priya",
-  "Parth", "Rohan", "Karan", "Dev", "Nikhil",
-  "Amit", "Rahul", "Suresh", "Manish", "Vikram",
-  "Neha", "Pooja", "Anjali", "Meera", "Kavita",
-  "Raj", "Arun", "Siddharth", "Yash", "Om",
-  "Tanvi", "Nisha", "Shruti", "Divya", "Preeti",
-  "Harsh", "Gaurav", "Rajesh", "Sanjay", "Mohan",
+const memberNames = [
+  "Aarav Sharma", "Vivaan Patel", "Aditya Kumar", "Vihaan Singh", "Arjun Reddy",
+  "Sai Verma", "Reyansh Joshi", "Ayaan Gupta", "Krishna Nair", "Ishaan Mehta",
+  "Shaurya Rao", "Ananya Desai", "Diya Iyer", "Myra Kapoor", "Sara Malhotra",
+  "Aadhya Chauhan", "Isha Bhat", "Kiara Saxena", "Riya Pillai", "Priya Das",
+  "Parth Agarwal", "Rohan Kulkarni", "Karan Menon", "Dev Thakur", "Nikhil Bhatia",
+  "Amit Joshi", "Rahul Pandey", "Suresh Hegde", "Manish Tiwari", "Vikram Shetty",
+  "Neha Rangan", "Pooja Acharya", "Anjali Mukherjee", "Meera Nair", "Kavita Shenoy",
+  "Raj Khandelwal", "Arun Subramanian", "Siddharth Dutta", "Yash Phadke", "Om Raut",
+  "Tanvi Khanna", "Nisha Bhatt", "Shruti Vaidya", "Divya Iyengar", "Preeti Srinivas",
+  "Harsh Dalal", "Gaurav Parekh", "Rajesh Goyal", "Sanjay Luthra", "Mohan Chandra",
 ];
 
 async function main() {
@@ -37,10 +37,10 @@ async function main() {
   }
 
   let created = 0;
-  for (let i = 0; i < demoNames.length; i++) {
-    const name = demoNames[i];
-    const email = `${name.toLowerCase()}@demouser.in`;
-    const password = `demousernumber${i + 1}`;
+  for (let i = 0; i < memberNames.length; i++) {
+    const name = memberNames[i];
+    const email = name.toLowerCase().replace(/\s+/g, ".") + "@taskflow.io";
+    const password = `Member@${(i + 1).toString().padStart(3, "0")}`;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -61,7 +61,7 @@ async function main() {
     console.log(`Created: ${email} / ${password}`);
   }
 
-  console.log(`\nDone. Created ${created} demo users.`);
+  console.log(`\nDone. Created ${created} team members.`);
 }
 
 main()

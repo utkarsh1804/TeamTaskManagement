@@ -135,6 +135,7 @@ model InviteLink {
   id        String   @id @default(uuid())
   token     String   @unique
   projectId String
+  email     String?
   role      ProjectRole
   expiresAt DateTime
   usedAt    DateTime?

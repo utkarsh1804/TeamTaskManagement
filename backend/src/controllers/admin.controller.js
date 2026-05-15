@@ -267,6 +267,49 @@ const acceptInviteLink = async (req, res, next) => {
   }
 };
 
+const bulkAddDemoUsers = async (req, res, next) => {
+  try {
+    const projectId = req.params.id;
+
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Project not found", code: "NOT_FOUND" });
+    }
+
+    const demoUsers = await prisma.user.findMany({
+      where: { email: { endsWith: "@demouser.in" } },
+      select: { id: true },
+    });
+
+    const existingMembers = await prisma.projectMember.findMany({
+      where: { projectId },
+      select: { userId: true },
+    });
+
+    const existingIds = new Set(existingMembers.map((m) => m.userId));
+    const toAdd = demoUsers.filter((u) => !existingIds.has(u.id));
+
+    if (toAdd.length === 0) {
+      return res.json({ success: true, message: "All demo users already in project", added: 0 });
+    }
+
+    await prisma.projectMember.createMany({
+      data: toAdd.map((u) => ({ projectId, userId: u.id, role: "MEMBER" })),
+      skipDuplicates: true,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Added ${toAdd.length} demo users to project`,
+      added: toAdd.length,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   requestAdmin,
   listAdminRequests,
@@ -274,4 +317,5 @@ module.exports = {
   rejectAdminRequest,
   generateInviteLink,
   acceptInviteLink,
+  bulkAddDemoUsers,
 };

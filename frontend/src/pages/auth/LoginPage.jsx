@@ -22,7 +22,10 @@ const LoginPage = () => {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema) });
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { email: "admin@teamtask.io", password: "Admin@1234" },
+  });
 
   const onSubmit = async (values) => {
     setError("");
@@ -81,6 +84,12 @@ const LoginPage = () => {
           </div>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
+
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+              For testing only — admin credentials are prefilled above.
+            </p>
+          </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in..." : "Sign in"}

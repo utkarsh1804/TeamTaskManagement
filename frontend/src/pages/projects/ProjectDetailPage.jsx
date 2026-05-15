@@ -28,6 +28,7 @@ const ProjectDetailPage = () => {
   const [inviteError, setInviteError] = useState("");
   const [inviteLink, setInviteLink] = useState("");
   const [linkRole, setLinkRole] = useState("MEMBER");
+  const [demoMsg, setDemoMsg] = useState("");
 
   const { data: projectData } = useQuery({
     queryKey: ["project", id],
@@ -152,6 +153,18 @@ const ProjectDetailPage = () => {
       navigator.clipboard.writeText(inviteLink);
     }
   };
+
+  const bulkDemoMutation = useMutation({
+    mutationFn: (projectId) =>
+      api.post(`/admin/projects/${projectId}/bulk-add-demo-users`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["project", id] });
+      setDemoMsg(res.data.message);
+    },
+    onError: (err) => {
+      setDemoMsg(err?.response?.data?.error || "Failed to add demo users");
+    },
+  });
 
   return (
     <section className="space-y-8">
@@ -330,43 +343,62 @@ const ProjectDetailPage = () => {
               </form>
 
               {user?.globalRole === "ADMIN" && (
-                <div className="rounded-2xl border border-border bg-card p-6">
-                  <h3 className="text-lg font-semibold">Generate invite link</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Create a shareable link for this project.
-                  </p>
-                  <div className="mt-4 space-y-3">
-                    <select
-                      value={linkRole}
-                      onChange={(event) => setLinkRole(event.target.value)}
-                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="MEMBER">MEMBER</option>
-                      <option value="ADMIN">ADMIN</option>
-                    </select>
+                <>
+                  <div className="rounded-2xl border border-border bg-card p-6">
+                    <h3 className="text-lg font-semibold">Generate invite link</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Create a shareable link for this project.
+                    </p>
+                    <div className="mt-4 space-y-3">
+                      <select
+                        value={linkRole}
+                        onChange={(event) => setLinkRole(event.target.value)}
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="MEMBER">MEMBER</option>
+                        <option value="ADMIN">ADMIN</option>
+                      </select>
+                      <Button
+                        type="button"
+                        onClick={handleGenerateLink}
+                        disabled={generateLinkMutation.isPending}
+                        className="w-full"
+                      >
+                        {generateLinkMutation.isPending ? "Generating..." : "Generate Link"}
+                      </Button>
+                      {inviteLink && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={inviteLink}
+                            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                          />
+                          <Button type="button" variant="outline" onClick={copyLink}>
+                            Copy
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-card p-6">
+                    <h3 className="text-lg font-semibold">Add demo users</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Bulk-add 50 demo accounts to this project for task allocation.
+                    </p>
                     <Button
                       type="button"
-                      onClick={handleGenerateLink}
-                      disabled={generateLinkMutation.isPending}
-                      className="w-full"
+                      onClick={() => bulkDemoMutation.mutate(id)}
+                      disabled={bulkDemoMutation.isPending}
+                      className="mt-4 w-full"
                     >
-                      {generateLinkMutation.isPending ? "Generating..." : "Generate Link"}
+                      {bulkDemoMutation.isPending ? "Adding..." : "Add All Demo Users"}
                     </Button>
-                    {inviteLink && (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={inviteLink}
-                          className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                        />
-                        <Button type="button" variant="outline" onClick={copyLink}>
-                          Copy
-                        </Button>
-                      </div>
+                    {demoMsg && (
+                      <p className="mt-2 text-xs text-muted-foreground">{demoMsg}</p>
                     )}
                   </div>
-                </div>
+                </>
               )}
             </>
           )}

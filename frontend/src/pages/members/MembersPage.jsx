@@ -13,6 +13,8 @@ const MembersPage = () => {
   const [inviteLink, setInviteLink] = useState("");
   const [linkRole, setLinkRole] = useState("MEMBER");
   const [linkProjectId, setLinkProjectId] = useState("");
+  const [demoProjectId, setDemoProjectId] = useState("");
+  const [demoMsg, setDemoMsg] = useState("");
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -86,6 +88,18 @@ const MembersPage = () => {
       navigator.clipboard.writeText(inviteLink);
     }
   };
+
+  const bulkDemoMutation = useMutation({
+    mutationFn: (projectId) =>
+      api.post(`/admin/projects/${projectId}/bulk-add-demo-users`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setDemoMsg(res.data.message);
+    },
+    onError: (err) => {
+      setDemoMsg(err?.response?.data?.error || "Failed to add demo users");
+    },
+  });
 
   return (
     <section className="space-y-8">
@@ -205,6 +219,37 @@ const MembersPage = () => {
               </div>
             )}
           </form>
+
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold">Add all demo users to a project</h3>
+            <p className="text-sm text-muted-foreground">
+              Bulk-add 50 demo accounts to a project for task allocation testing.
+            </p>
+            <div className="mt-4 flex items-end gap-4">
+              <select
+                value={demoProjectId}
+                onChange={(event) => setDemoProjectId(event.target.value)}
+                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select project</option>
+                {projects?.items?.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                disabled={!demoProjectId || bulkDemoMutation.isPending}
+                onClick={() => bulkDemoMutation.mutate(demoProjectId)}
+              >
+                {bulkDemoMutation.isPending ? "Adding..." : "Add Demo Users"}
+              </Button>
+            </div>
+            {demoMsg && (
+              <p className="mt-2 text-xs text-muted-foreground">{demoMsg}</p>
+            )}
+          </div>
         </>
       )}
     </section>

@@ -41,11 +41,24 @@ router.post(
 );
 router.post("/invites/:token", authMiddleware, acceptInviteLink);
 router.get("/users", authMiddleware, requireGlobalAdmin, listAllUsers);
+router.get("/users/:userId", authMiddleware, requireGlobalAdmin, getMemberDetails);
 router.post(
   "/projects/:id/add-members",
   authMiddleware,
   requireGlobalAdmin,
   addMembersToProject
+);
+router.post(
+  "/users/:userId/move",
+  authMiddleware,
+  requireGlobalAdmin,
+  moveMemberToProject
+);
+router.delete(
+  "/users/:userId/projects/:projectId",
+  authMiddleware,
+  requireGlobalAdmin,
+  removeMemberFromProject
 );
 
 module.exports = router;

@@ -4,6 +4,9 @@ import RequireAuth from "@/components/RequireAuth";
 import AppLayout from "@/components/layout/AppLayout";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
+import AdminLoginPage from "@/pages/auth/AdminLoginPage";
+import AdminRequestsPage from "@/pages/auth/AdminRequestsPage";
+import InviteAcceptPage from "@/pages/auth/InviteAcceptPage";
 import DashboardPage from "@/pages/dashboard/DashboardPage";
 import ProjectsPage from "@/pages/projects/ProjectsPage";
 import ProjectDetailPage from "@/pages/projects/ProjectDetailPage";
@@ -15,6 +18,8 @@ import NotificationsPage from "@/pages/notifications/NotificationsPage";
 const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
+  { path: "/admin-login", element: <AdminLoginPage /> },
+  { path: "/invite/:token", element: <InviteAcceptPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -29,6 +34,7 @@ const router = createBrowserRouter([
           { path: "tasks/:id", element: <TaskDetailPage /> },
           { path: "members", element: <MembersPage /> },
           { path: "notifications", element: <NotificationsPage /> },
+          { path: "admin-requests", element: <AdminRequestsPage /> },
         ],
       },
     ],

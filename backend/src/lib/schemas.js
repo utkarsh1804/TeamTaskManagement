@@ -10,7 +10,6 @@ const registerSchema = z.object({
   name: z.string().min(2, "Name is required"),
   email: z.string().email("Invalid email"),
   password: passwordSchema,
-  globalRole: z.enum(["ADMIN", "MEMBER"]),
 });
 
 const loginSchema = z.object({
@@ -50,6 +49,16 @@ const taskStatusSchema = z.object({
   status: z.enum(["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"]),
 });
 
+const adminRequestSchema = z.object({
+  name: z.string().min(2, "Name is required"),
+  email: z.string().email("Invalid email"),
+  password: passwordSchema,
+});
+
+const inviteLinkSchema = z.object({
+  role: z.enum(["ADMIN", "MEMBER"]).optional(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -60,4 +69,6 @@ module.exports = {
   taskCreateSchema,
   taskUpdateSchema,
   taskStatusSchema,
+  adminRequestSchema,
+  inviteLinkSchema,
 };

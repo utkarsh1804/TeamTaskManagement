@@ -10,10 +10,11 @@ const userSelect = {
   createdAt: true,
 };
 
+const isProd = process.env.NODE_ENV === "production";
 const cookieOptions = {
   httpOnly: true,
-  sameSite: "strict",
-  secure: process.env.NODE_ENV === "production",
+  sameSite: isProd ? "none" : "lax",
+  secure: isProd,
 };
 
 const signToken = (user) =>
@@ -31,7 +32,7 @@ const register = async (req, res, next) => {
       });
     }
 
-    const { name, email, password, globalRole } = req.body;
+    const { name, email, password } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
@@ -42,7 +43,7 @@ const register = async (req, res, next) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name, email, passwordHash, globalRole },
+      data: { name, email, passwordHash, globalRole: "MEMBER" },
       select: userSelect,
     });
 
@@ -89,7 +90,7 @@ const login = async (req, res, next) => {
     const token = signToken(user);
     res.cookie("token", token, cookieOptions);
 
-    return res.json({ user });
+    return res.json({ user, token });
   } catch (error) {
     return next(error);
   }

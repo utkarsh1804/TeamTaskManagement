@@ -16,7 +16,6 @@ const schema = z.object({
     .min(8, "Password must be at least 8 characters")
     .regex(/[A-Z]/, "Add one uppercase letter")
     .regex(/\d/, "Add one number"),
-  globalRole: z.enum(["ADMIN", "MEMBER"]),
 });
 
 const RegisterPage = () => {
@@ -28,12 +27,15 @@ const RegisterPage = () => {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(schema), defaultValues: { globalRole: "MEMBER" } });
+  } = useForm({ resolver: zodResolver(schema) });
 
   const onSubmit = async (values) => {
     setError("");
     try {
       const { data } = await api.post("/auth/register", values);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
       setUser(data.user);
       navigate("/");
     } catch (err) {
@@ -50,7 +52,7 @@ const RegisterPage = () => {
           </p>
           <h1 className="text-3xl font-semibold">Create your account</h1>
           <p className="text-sm text-muted-foreground">
-            Pick a role and start organizing your team work.
+            Start organizing your team work.
           </p>
         </div>
 
@@ -86,7 +88,7 @@ const RegisterPage = () => {
             <input
               type="password"
               className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              placeholder="At least 8 chars"
+              placeholder="At least 8 chars, 1 uppercase, 1 number"
               {...register("password")}
             />
             {errors.password && (
@@ -96,17 +98,6 @@ const RegisterPage = () => {
             )}
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Role</label>
-            <select
-              className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              {...register("globalRole")}
-            >
-              <option value="ADMIN">Admin</option>
-              <option value="MEMBER">Member</option>
-            </select>
-          </div>
-
           {error && <p className="text-xs text-destructive">{error}</p>}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -114,12 +105,20 @@ const RegisterPage = () => {
           </Button>
         </form>
 
-        <p className="mt-6 text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link to="/login" className="text-primary underline-offset-4 hover:underline">
-            Sign in
-          </Link>
-        </p>
+        <div className="mt-4 space-y-2 text-center">
+          <p className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+              Sign in
+            </Link>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Want admin access?{" "}
+            <Link to="/admin-login" className="text-primary underline-offset-4 hover:underline">
+              Request here
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

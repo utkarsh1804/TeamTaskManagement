@@ -28,6 +28,9 @@ const LoginPage = () => {
     setError("");
     try {
       const { data } = await api.post("/auth/login", values);
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
       setUser(data.user);
       navigate("/");
     } catch (err) {
@@ -84,12 +87,20 @@ const LoginPage = () => {
           </Button>
         </form>
 
-        <p className="mt-6 text-sm text-muted-foreground">
-          Need an account?{" "}
-          <Link to="/register" className="text-primary underline-offset-4 hover:underline">
-            Register
-          </Link>
-        </p>
+        <div className="mt-4 space-y-2 text-center">
+          <p className="text-sm text-muted-foreground">
+            Need an account?{" "}
+            <Link to="/register" className="text-primary underline-offset-4 hover:underline">
+              Register
+            </Link>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Admin access?{" "}
+            <Link to="/admin-login" className="text-primary underline-offset-4 hover:underline">
+              Login as Admin
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

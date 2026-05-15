@@ -8,6 +8,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  ShieldCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -15,19 +16,23 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { useThemeStore } from "@/store/themeStore";
 
-const navItems = [
-  { to: "/", label: "Dashboard", icon: LayoutGrid },
-  { to: "/projects", label: "Projects", icon: FolderOpen },
-  { to: "/my-tasks", label: "My Tasks", icon: CheckCircle2 },
-  { to: "/members", label: "Members", icon: Users },
-  { to: "/notifications", label: "Notifications", icon: Bell },
-];
-
 const Sidebar = () => {
   const dark = useThemeStore((state) => state.dark);
   const toggle = useThemeStore((state) => state.toggle);
+  const user = useAuthStore((state) => state.user);
   const clearUser = useAuthStore((state) => state.clearUser);
   const navigate = useNavigate();
+
+  const navItems = [
+    { to: "/", label: "Dashboard", icon: LayoutGrid },
+    { to: "/projects", label: "Projects", icon: FolderOpen },
+    { to: "/my-tasks", label: "My Tasks", icon: CheckCircle2 },
+    { to: "/members", label: "Members", icon: Users },
+    { to: "/notifications", label: "Notifications", icon: Bell },
+    ...(user?.globalRole === "ADMIN"
+      ? [{ to: "/admin-requests", label: "Admin Requests", icon: ShieldCheck }]
+      : []),
+  ];
 
   const handleLogout = async () => {
     try {

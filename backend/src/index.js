@@ -8,6 +8,7 @@ const authRoutes = require("./routes/auth.routes");
 const projectsRoutes = require("./routes/projects.routes");
 const tasksRoutes = require("./routes/tasks.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
+const adminRoutes = require("./routes/admin.routes");
 const { startCron } = require("./lib/cron");
 
 const app = express();
@@ -33,6 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
 app.use("/api", dashboardRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, error: "Not Found", code: "NOT_FOUND" });

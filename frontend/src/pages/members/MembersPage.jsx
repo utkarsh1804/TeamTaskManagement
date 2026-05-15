@@ -10,6 +10,9 @@ const MembersPage = () => {
   const queryClient = useQueryClient();
   const [invite, setInvite] = useState({ projectId: "", email: "", role: "MEMBER" });
   const [error, setError] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [linkRole, setLinkRole] = useState("MEMBER");
+  const [linkProjectId, setLinkProjectId] = useState("");
 
   const { data: projects } = useQuery({
     queryKey: ["projects"],
@@ -48,6 +51,18 @@ const MembersPage = () => {
     },
   });
 
+  const generateLinkMutation = useMutation({
+    mutationFn: ({ projectId, role }) =>
+      api.post(`/admin/projects/${projectId}/invite-link`, { role }),
+    onSuccess: (res) => {
+      setInviteLink(res.data.link);
+      setError("");
+    },
+    onError: (err) => {
+      setError(err?.response?.data?.error || "Failed to generate link");
+    },
+  });
+
   const handleInvite = (event) => {
     event.preventDefault();
     if (!invite.projectId || !invite.email) {
@@ -55,6 +70,21 @@ const MembersPage = () => {
       return;
     }
     inviteMutation.mutate(invite);
+  };
+
+  const handleGenerateLink = (event) => {
+    event.preventDefault();
+    if (!linkProjectId) {
+      setError("Select a project");
+      return;
+    }
+    generateLinkMutation.mutate({ projectId: linkProjectId, role: linkRole });
+  };
+
+  const copyLink = () => {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink);
+    }
   };
 
   return (
@@ -86,48 +116,96 @@ const MembersPage = () => {
       </div>
 
       {user?.globalRole === "ADMIN" && (
-        <form onSubmit={handleInvite} className="rounded-2xl border border-border bg-card p-6">
-          <h3 className="text-lg font-semibold">Invite member</h3>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            <select
-              value={invite.projectId}
-              onChange={(event) =>
-                setInvite((prev) => ({ ...prev, projectId: event.target.value }))
-              }
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="">Select project</option>
-              {projects?.items?.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="email"
-              value={invite.email}
-              onChange={(event) =>
-                setInvite((prev) => ({ ...prev, email: event.target.value }))
-              }
-              placeholder="member@company.com"
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            />
-            <select
-              value={invite.role}
-              onChange={(event) =>
-                setInvite((prev) => ({ ...prev, role: event.target.value }))
-              }
-              className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
-            >
-              <option value="MEMBER">MEMBER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </div>
-          {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-          <Button type="submit" className="mt-4" disabled={inviteMutation.isPending}>
-            {inviteMutation.isPending ? "Inviting..." : "Send invite"}
-          </Button>
-        </form>
+        <>
+          <form onSubmit={handleInvite} className="rounded-2xl border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold">Invite member by email</h3>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <select
+                value={invite.projectId}
+                onChange={(event) =>
+                  setInvite((prev) => ({ ...prev, projectId: event.target.value }))
+                }
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select project</option>
+                {projects?.items?.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="email"
+                value={invite.email}
+                onChange={(event) =>
+                  setInvite((prev) => ({ ...prev, email: event.target.value }))
+                }
+                placeholder="member@company.com"
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              />
+              <select
+                value={invite.role}
+                onChange={(event) =>
+                  setInvite((prev) => ({ ...prev, role: event.target.value }))
+                }
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="MEMBER">MEMBER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+            {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+            <Button type="submit" className="mt-4" disabled={inviteMutation.isPending}>
+              {inviteMutation.isPending ? "Inviting..." : "Send invite"}
+            </Button>
+          </form>
+
+          <form onSubmit={handleGenerateLink} className="rounded-2xl border border-border bg-card p-6">
+            <h3 className="text-lg font-semibold">Generate invite link</h3>
+            <p className="text-sm text-muted-foreground">
+              Create a shareable link that lets anyone join a project.
+            </p>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <select
+                value={linkProjectId}
+                onChange={(event) => setLinkProjectId(event.target.value)}
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select project</option>
+                {projects?.items?.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={linkRole}
+                onChange={(event) => setLinkRole(event.target.value)}
+                className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="MEMBER">MEMBER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+              <Button type="submit" disabled={generateLinkMutation.isPending}>
+                {generateLinkMutation.isPending ? "Generating..." : "Generate Link"}
+              </Button>
+            </div>
+
+            {inviteLink && (
+              <div className="mt-4 flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={inviteLink}
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                />
+                <Button type="button" variant="outline" onClick={copyLink}>
+                  Copy
+                </Button>
+              </div>
+            )}
+          </form>
+        </>
       )}
     </section>
   );

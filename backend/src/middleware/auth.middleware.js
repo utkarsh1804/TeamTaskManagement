@@ -1,7 +1,17 @@
 const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
-  const token = req.cookies && req.cookies.token;
+  let token = null;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
+
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
+
   if (!token) {
     return res
       .status(401)

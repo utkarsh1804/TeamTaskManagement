@@ -13,6 +13,12 @@ enum GlobalRole {
   MEMBER
 }
 
+enum AdminRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum ProjectRole {
   ADMIN
   MEMBER
@@ -50,6 +56,7 @@ model User {
   assignedTasks Task[]         @relation("TaskAssignee")
   createdTasks  Task[]         @relation("TaskCreator")
   activityLogs  ActivityLog[]
+  reviewedAdminRequests AdminRequest[] @relation("AdminReviewer")
 }
 
 model Project {
@@ -62,6 +69,7 @@ model Project {
   members     ProjectMember[]
   tasks       Task[]
   activityLogs ActivityLog[]
+  inviteLinks InviteLink[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -109,4 +117,28 @@ model ActivityLog {
 
   user    User     @relation(fields: [userId], references: [id])
   project Project? @relation(fields: [projectId], references: [id])
+}
+
+model AdminRequest {
+  id        String             @id @default(uuid())
+  name      String
+  email     String             @unique
+  passwordHash String
+  status    AdminRequestStatus @default(PENDING)
+  reviewedBy String?
+  reviewer  User?              @relation("AdminReviewer", fields: [reviewedBy], references: [id])
+  createdAt DateTime           @default(now())
+  reviewedAt DateTime?
+}
+
+model InviteLink {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  projectId String
+  role      ProjectRole
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
 }

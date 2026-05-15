@@ -26,6 +26,8 @@ const ProjectDetailPage = () => {
   const queryClient = useQueryClient();
   const [invite, setInvite] = useState({ email: "", role: "MEMBER" });
   const [inviteError, setInviteError] = useState("");
+  const [inviteLink, setInviteLink] = useState("");
+  const [linkRole, setLinkRole] = useState("MEMBER");
 
   const { data: projectData } = useQuery({
     queryKey: ["project", id],
@@ -96,6 +98,17 @@ const ProjectDetailPage = () => {
     },
   });
 
+  const generateLinkMutation = useMutation({
+    mutationFn: ({ projectId, role }) =>
+      api.post(`/admin/projects/${projectId}/invite-link`, { role }),
+    onSuccess: (res) => {
+      setInviteLink(res.data.link);
+    },
+    onError: (err) => {
+      setInviteError(err?.response?.data?.error || "Failed to generate link");
+    },
+  });
+
   const updateRoleMutation = useMutation({
     mutationFn: ({ userId, role }) =>
       api.patch(`/projects/${id}/members/${userId}`, { role }),
@@ -128,6 +141,16 @@ const ProjectDetailPage = () => {
       return;
     }
     inviteMutation.mutate(invite);
+  };
+
+  const handleGenerateLink = () => {
+    generateLinkMutation.mutate({ projectId: id, role: linkRole });
+  };
+
+  const copyLink = () => {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink);
+    }
   };
 
   return (
@@ -274,36 +297,78 @@ const ProjectDetailPage = () => {
           </div>
 
           {isProjectAdmin && (
-            <form onSubmit={handleInvite} className="rounded-2xl border border-border bg-card p-6">
-              <h3 className="text-lg font-semibold">Invite member</h3>
-              <div className="mt-4 space-y-3">
-                <input
-                  type="email"
-                  value={invite.email}
-                  onChange={(event) =>
-                    setInvite((prev) => ({ ...prev, email: event.target.value }))
-                  }
-                  placeholder="member@company.com"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                />
-                <select
-                  value={invite.role}
-                  onChange={(event) =>
-                    setInvite((prev) => ({ ...prev, role: event.target.value }))
-                  }
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="MEMBER">MEMBER</option>
-                  <option value="ADMIN">ADMIN</option>
-                </select>
-                {inviteError && (
-                  <p className="text-xs text-destructive">{inviteError}</p>
-                )}
-                <Button type="submit" disabled={inviteMutation.isPending}>
-                  {inviteMutation.isPending ? "Inviting..." : "Send invite"}
-                </Button>
-              </div>
-            </form>
+            <>
+              <form onSubmit={handleInvite} className="rounded-2xl border border-border bg-card p-6">
+                <h3 className="text-lg font-semibold">Invite member by email</h3>
+                <div className="mt-4 space-y-3">
+                  <input
+                    type="email"
+                    value={invite.email}
+                    onChange={(event) =>
+                      setInvite((prev) => ({ ...prev, email: event.target.value }))
+                    }
+                    placeholder="member@company.com"
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <select
+                    value={invite.role}
+                    onChange={(event) =>
+                      setInvite((prev) => ({ ...prev, role: event.target.value }))
+                    }
+                    className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="MEMBER">MEMBER</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                  {inviteError && (
+                    <p className="text-xs text-destructive">{inviteError}</p>
+                  )}
+                  <Button type="submit" disabled={inviteMutation.isPending}>
+                    {inviteMutation.isPending ? "Inviting..." : "Send invite"}
+                  </Button>
+                </div>
+              </form>
+
+              {user?.globalRole === "ADMIN" && (
+                <div className="rounded-2xl border border-border bg-card p-6">
+                  <h3 className="text-lg font-semibold">Generate invite link</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Create a shareable link for this project.
+                  </p>
+                  <div className="mt-4 space-y-3">
+                    <select
+                      value={linkRole}
+                      onChange={(event) => setLinkRole(event.target.value)}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="MEMBER">MEMBER</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </select>
+                    <Button
+                      type="button"
+                      onClick={handleGenerateLink}
+                      disabled={generateLinkMutation.isPending}
+                      className="w-full"
+                    >
+                      {generateLinkMutation.isPending ? "Generating..." : "Generate Link"}
+                    </Button>
+                    {inviteLink && (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={inviteLink}
+                          className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                        />
+                        <Button type="button" variant="outline" onClick={copyLink}>
+                          Copy
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

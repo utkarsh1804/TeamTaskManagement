@@ -9,7 +9,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "start:railway": "npm run prisma:deploy && node src/index.js",
+    "start:railway": "node scripts/migrate-and-start.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

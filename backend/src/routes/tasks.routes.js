@@ -9,12 +9,14 @@ const {
   updateTaskStatus,
   deleteTask,
   listOverdueTasks,
+  listMyTasks,
 } = require("../controllers/tasks.controller");
 
 const router = express.Router();
 
 router.use(authMiddleware);
 
+router.get("/", listMyTasks);
 router.get("/overdue", listOverdueTasks);
 router.get("/:id", getTask);
 router.patch("/:id", validate(taskUpdateSchema), updateTask);

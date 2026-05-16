@@ -578,7 +578,6 @@ const autoAcceptPendingInvites = async (userId, email) => {
     if (!existing) {
       await prisma.projectMember.create({
         data: { projectId: invite.projectId, userId, role: invite.role },
-        skipDuplicates: true,
       });
     }
 

@@ -10,34 +10,23 @@ const MyTasksPage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
+  const { data: tasksData } = useQuery({
+    queryKey: ["my-tasks"],
     queryFn: async () => {
-      const { data } = await api.get("/projects");
+      const { data } = await api.get("/tasks");
       return data;
     },
   });
 
-  const projectIds = projects?.items?.map((project) => project.id) || [];
-
-  const { data: tasks = [] } = useQuery({
-    queryKey: ["my-tasks", projectIds, user?.id],
-    enabled: projectIds.length > 0 && Boolean(user?.id),
-    queryFn: async () => {
-      const responses = await Promise.all(
-        projectIds.map((id) =>
-          api.get(`/projects/${id}/tasks`, { params: { assignee: user.id } })
-        )
-      );
-      return responses.flatMap((response) => response.data.items || []);
-    },
-  });
+  const tasks =
+    tasksData?.items?.filter((task) => task.assigneeId === user?.id) || [];
 
   const statusMutation = useMutation({
     mutationFn: ({ taskId, status }) =>
       api.patch(`/tasks/${taskId}/status`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
   });

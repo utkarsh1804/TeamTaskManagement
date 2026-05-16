@@ -431,6 +431,35 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
+const listMyTasks = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const projects = await prisma.project.findMany({
+      where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
+      select: { id: true },
+    });
+
+    const projectIds = projects.map((project) => project.id);
+    if (projectIds.length === 0) {
+      return res.json({ items: [] });
+    }
+
+    const tasks = await prisma.task.findMany({
+      where: { projectId: { in: projectIds } },
+      include: {
+        project: { select: { id: true, name: true } },
+        assignee: { select: userSelect },
+        createdBy: { select: userSelect },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ items: tasks });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const listOverdueTasks = async (req, res, next) => {
   try {
     const userId = req.user.id;
@@ -466,6 +495,7 @@ const listOverdueTasks = async (req, res, next) => {
 
 module.exports = {
   listProjectTasks,
+  listMyTasks,
   createTask,
   getTask,
   updateTask,

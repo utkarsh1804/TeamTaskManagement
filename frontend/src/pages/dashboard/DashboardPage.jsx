@@ -3,13 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import api from "@/lib/api";
-import { useAuthStore } from "@/store/authStore";
 import TaskRow from "@/components/tasks/TaskRow";
 
 const statusOrder = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
 const DashboardPage = () => {
-  const user = useAuthStore((state) => state.user);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
@@ -21,24 +19,11 @@ const DashboardPage = () => {
     },
   });
 
-  const { data: projects } = useQuery({
-    queryKey: ["projects"],
+  const { data: tasksData } = useQuery({
+    queryKey: ["dashboard-tasks"],
     queryFn: async () => {
-      const { data } = await api.get("/projects");
+      const { data } = await api.get("/tasks");
       return data;
-    },
-  });
-
-  const projectIds = projects?.items?.map((project) => project.id) || [];
-
-  const { data: tasks = [] } = useQuery({
-    queryKey: ["dashboard-tasks", projectIds],
-    enabled: projectIds.length > 0,
-    queryFn: async () => {
-      const responses = await Promise.all(
-        projectIds.map((id) => api.get(`/projects/${id}/tasks`))
-      );
-      return responses.flatMap((response) => response.data.items || []);
     },
   });
 
@@ -49,11 +34,11 @@ const DashboardPage = () => {
       IN_REVIEW: [],
       DONE: [],
     };
-    tasks.forEach((task) => {
+    (tasksData?.items || []).forEach((task) => {
       grouped[task.status]?.push(task);
     });
     return grouped;
-  }, [tasks]);
+  }, [tasksData]);
 
   const statusMutation = useMutation({
     mutationFn: ({ taskId, status }) =>

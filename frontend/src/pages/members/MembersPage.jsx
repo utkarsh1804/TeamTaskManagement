@@ -311,6 +311,7 @@ const MembersPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [addMsg, setAddMsg] = useState("");
+  const [inviteMsg, setInviteMsg] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
 
   const { data: projects } = useQuery({
@@ -377,11 +378,17 @@ const MembersPage = () => {
   }, [allUsers, projectMemberIds, searchTerm]);
 
   const inviteMutation = useMutation({
-    mutationFn: (payload) => api.post(`/projects/${payload.projectId}/members`, payload),
-    onSuccess: () => {
+    mutationFn: (payload) =>
+      api.post(`/admin/projects/${payload.projectId}/email-invite`, {
+        email: payload.email,
+        role: payload.role,
+      }),
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       setInvite({ projectId: "", email: "", role: "MEMBER" });
       setError("");
+      setInviteMsg(res.data.message);
+      setTimeout(() => setInviteMsg(""), 4000);
     },
     onError: (err) => {
       setError(err?.response?.data?.error || "Unable to invite member");
@@ -552,6 +559,7 @@ const MembersPage = () => {
               </select>
             </div>
             {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+            {inviteMsg && <p className="mt-2 text-xs text-green-600">{inviteMsg}</p>}
             <Button type="submit" className="mt-4" disabled={inviteMutation.isPending}>
               {inviteMutation.isPending ? "Inviting..." : "Send invite"}
             </Button>

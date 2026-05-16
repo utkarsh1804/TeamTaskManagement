@@ -12,17 +12,28 @@ Create a Railway service from the repo and set:
 - **Root Directory**: `backend`
 - **Start Command**: `npm run start:railway`
 
-Recommended env vars:
-- `DATABASE_URL` = Supabase pooler URL (IPv4-friendly)
-- `DIRECT_URL` = Supabase direct URL (for migrations)
-- `JWT_SECRET` = random secret
-- `JWT_EXPIRES_IN` = `7d`
-- `FRONTEND_URL` = your Railway frontend URL
-- `NODE_ENV` = `production`
-- `RESEND_API_KEY` (optional)
-- `RESEND_FROM_EMAIL` (optional)
+### Required env vars
+| Variable | Value | Notes |
+|---|---|---|
+| `DATABASE_URL` | Supabase pooler URL | IPv4-friendly connection string |
+| `DIRECT_URL` | Supabase direct URL | For Prisma migrations |
+| `JWT_SECRET` | Random secret | Generate with `openssl rand -base64 32` |
+| `JWT_EXPIRES_IN` | `7d` | Token lifetime |
+| `FRONTEND_URL` | `https://frontendteamtask.up.railway.app` | Your Railway frontend URL |
+| `NODE_ENV` | `production` | Required for secure cookies |
 
-Health check:
+### Email setup (Resend)
+1. Go to [resend.com](https://resend.com) and create an API key
+2. Add the API key to Railway: `RESEND_API_KEY=re_...`
+3. **Option A - Testing (no domain verification needed):**
+   - Set `RESEND_FROM_EMAIL=TeamTask <onboarding@resend.dev>`
+   - Limited to 100 emails/day, works immediately
+4. **Option B - Production (custom domain):**
+   - In Resend, add and verify your domain: `frontendteamtask.up.railway.app`
+   - Add the DNS records Resend provides to your domain registrar
+   - Once verified, set `RESEND_FROM_EMAIL=TeamTask <noreply@frontendteamtask.up.railway.app>`
+
+### Health check
 - `GET /api/health`
 
 ## 3) Frontend service (Railway)

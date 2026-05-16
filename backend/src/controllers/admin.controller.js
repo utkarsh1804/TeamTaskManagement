@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const prisma = require("../lib/prisma");
+const { sendEmail } = require("../lib/resend");
 
 const userSelect = {
   id: true,
@@ -518,15 +519,11 @@ const emailInvite = async (req, res, next) => {
 
       await prisma.projectMember.create({
         data: { projectId, userId: existingUser.id, role: memberRole },
-        skipDuplicates: true,
       });
 
       try {
-        const { Resend } = await import("resend");
-        const resend = new Resend(process.env.RESEND_API_KEY);
         const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-        await resend.emails.send({
-          from: "TeamTask <onboarding@resend.dev>",
+        await sendEmail({
           to: email,
           subject: `You've been added to ${project.name}`,
           html: `<p>Hi ${existingUser.name},</p><p>You've been added to the project <strong>${project.name}</strong> on TeamTask.</p><p>Log in to get started: <a href="${frontendUrl}">${frontendUrl}</a></p>`,
@@ -547,10 +544,7 @@ const emailInvite = async (req, res, next) => {
     const link = `${frontendUrl}/invite/${token}`;
 
     try {
-      const { Resend } = await import("resend");
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      await resend.emails.send({
-        from: "TeamTask <onboarding@resend.dev>",
+      await sendEmail({
         to: email,
         subject: `You're invited to join ${project.name}`,
         html: `<p>You've been invited to join the project <strong>${project.name}</strong> on TeamTask.</p><p>Click below to accept:</p><p><a href="${link}" style="display:inline-block;padding:10px 20px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;">Accept Invite</a></p><p>Or copy this link: ${link}</p><p>This invite expires in 7 days.</p>`,

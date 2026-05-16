@@ -1,12 +1,12 @@
 const { Resend } = require("resend");
 
 const resendApiKey = process.env.RESEND_API_KEY;
-const resendFrom = process.env.RESEND_FROM_EMAIL;
+const resendFrom = process.env.RESEND_FROM_EMAIL || "TeamTask <onboarding@resend.dev>";
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const sendEmail = async ({ to, subject, html }) => {
-  if (!resend || !resendFrom) {
-    console.warn("Resend is not configured. Email skipped.");
+  if (!resend) {
+    console.warn("Resend is not configured (missing RESEND_API_KEY). Email skipped.");
     return;
   }
 

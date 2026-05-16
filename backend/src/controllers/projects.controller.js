@@ -25,7 +25,6 @@ const listProjects = async (req, res, next) => {
       },
       include: {
         owner: { select: userSelect },
-        members: { include: { user: { select: userSelect } } },
         _count: { select: { tasks: true, members: true } },
       },
       orderBy: { createdAt: "desc" },

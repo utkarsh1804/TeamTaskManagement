@@ -10,6 +10,8 @@ import {
   Sun,
   ShieldCheck,
   UserCircle,
+  Building2,
+  Activity,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -27,8 +29,10 @@ const Sidebar = () => {
     { to: "/", label: "Dashboard", icon: LayoutGrid },
     { to: "/projects", label: "Projects", icon: FolderOpen },
     { to: "/my-tasks", label: "My Tasks", icon: CheckCircle2 },
+    { to: "/orgs", label: "Organizations", icon: Building2 },
     { to: "/members", label: "Members", icon: Users },
     { to: "/notifications", label: "Notifications", icon: Bell },
+    { to: "/audit-log", label: "Audit Log", icon: Activity },
     ...(user?.globalRole === "ADMIN"
       ? [{ to: "/admin-requests", label: "Admin Requests", icon: ShieldCheck }]
       : []),

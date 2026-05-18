@@ -1,5 +1,5 @@
 const prisma = require("../lib/prisma");
-const { getLastReadAt, markRead } = require("../lib/notifications");
+const notifications = require("../lib/notifications");
 
 const getAccessibleProjectIds = async (userId) => {
   const projects = await prisma.project.findMany({
@@ -91,22 +91,43 @@ const getDashboard = async (req, res, next) => {
 const getActivityLog = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const projectIds = await getAccessibleProjectIds(userId);
-
-    const { projectId } = req.query;
-    if (projectId && !projectIds.includes(projectId)) {
-      return res
-        .status(403)
-        .json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
-    }
+    const isGlobalAdmin = req.user.globalRole === "ADMIN";
+    const {
+      projectId,
+      entityType,
+      userId: filterUserId,
+      action,
+      from,
+      to,
+    } = req.query;
 
     const page = Math.max(parseInt(req.query.page || "1", 10), 1);
-    const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 50);
+    const limit = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
     const skip = (page - 1) * limit;
 
-    const where = projectId
-      ? { projectId }
-      : { projectId: { in: projectIds } };
+    const where = {};
+
+    if (!isGlobalAdmin) {
+      const projectIds = await getAccessibleProjectIds(userId);
+      if (projectId && !projectIds.includes(projectId)) {
+        return res
+          .status(403)
+          .json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+      }
+      where.projectId = projectId ? projectId : { in: projectIds };
+    } else if (projectId) {
+      where.projectId = projectId;
+    }
+
+    if (entityType) where.entityType = entityType;
+    if (filterUserId) where.userId = filterUserId;
+    if (action) where.action = { contains: action, mode: "insensitive" };
+
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) where.createdAt.lte = new Date(to);
+    }
 
     const [items, total] = await prisma.$transaction([
       prisma.activityLog.findMany({
@@ -114,12 +135,22 @@ const getActivityLog = async (req, res, next) => {
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          project: { select: { id: true, name: true } },
+        },
       }),
       prisma.activityLog.count({ where }),
     ]);
 
-    res.json({ items, page, limit, total });
+    res.json({
+      items,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      filters: { projectId, entityType, userId: filterUserId, action, from, to },
+    });
   } catch (error) {
     next(error);
   }
@@ -128,38 +159,79 @@ const getActivityLog = async (req, res, next) => {
 const getNotifications = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const projectIds = await getAccessibleProjectIds(userId);
-    const lastReadAt = getLastReadAt(userId);
+    const take = Math.min(Math.max(parseInt(req.query.limit || "20", 10), 1), 100);
+    const skip = Math.max(parseInt(req.query.skip || "0", 10), 0);
+    const unreadOnly = req.query.unreadOnly === "true";
 
-    const [unreadCount, items] = await prisma.$transaction([
-      prisma.activityLog.count({
-        where: {
-          projectId: { in: projectIds },
-          createdAt: { gt: lastReadAt },
-        },
-      }),
-      prisma.activityLog.findMany({
-        where: { projectId: { in: projectIds } },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        include: { user: { select: { id: true, name: true, email: true } } },
-      }),
-    ]);
-
-    res.json({ unreadCount, items, lastReadAt });
+    const result = await notifications.listForUser(userId, { take, skip, unreadOnly });
+    res.json(result);
   } catch (error) {
     next(error);
   }
 };
 
-const markNotificationsRead = (req, res) => {
-  markRead(req.user.id);
-  res.json({ success: true });
+const getUnreadCount = async (req, res, next) => {
+  try {
+    const count = await notifications.getUnreadCount(req.user.id);
+    res.json({ count });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const markNotificationsRead = async (req, res, next) => {
+  try {
+    await notifications.markAllRead(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const markOneRead = async (req, res, next) => {
+  try {
+    const result = await notifications.markRead(req.params.id, req.user.id);
+    if (!result) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Notification not found", code: "NOT_FOUND" });
+    }
+    res.json({ notification: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteNotification = async (req, res, next) => {
+  try {
+    const result = await notifications.remove(req.params.id, req.user.id);
+    if (!result.count) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Notification not found", code: "NOT_FOUND" });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteAllNotifications = async (req, res, next) => {
+  try {
+    const result = await notifications.removeAll(req.user.id);
+    res.json({ success: true, deleted: result.count });
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = {
   getDashboard,
   getActivityLog,
   getNotifications,
+  getUnreadCount,
   markNotificationsRead,
+  markOneRead,
+  deleteNotification,
+  deleteAllNotifications,
 };

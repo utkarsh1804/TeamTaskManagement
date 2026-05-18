@@ -1,6 +1,7 @@
 const prisma = require("../lib/prisma");
 const { logActivity } = require("../lib/activityLog");
 const { sendTaskAssigned, sendTaskDone } = require("../lib/resend");
+const notifications = require("../lib/notifications");
 
 const userSelect = {
   id: true,
@@ -164,6 +165,16 @@ const createTask = async (req, res, next) => {
         { assigneeId: task.assignee.id }
       );
       await sendTaskAssigned({ to: task.assignee.email, taskTitle: task.title });
+      if (task.assignee.id !== actor.id) {
+        await notifications.create({
+          userId: task.assignee.id,
+          type: notifications.NotificationType.TASK_ASSIGNED,
+          title: `${actor.name} assigned you a task`,
+          body: task.title,
+          link: `/tasks/${task.id}`,
+          meta: { taskId: task.id, projectId: task.projectId, assignedBy: actor.id },
+        });
+      }
     }
 
     res.status(201).json({ task });
@@ -289,6 +300,25 @@ const updateTask = async (req, res, next) => {
 
       if (updated.status === "DONE" && updated.createdBy) {
         await sendTaskDone({ to: updated.createdBy.email, taskTitle: updated.title });
+        if (updated.createdBy.id !== actor.id) {
+          await notifications.create({
+            userId: updated.createdBy.id,
+            type: notifications.NotificationType.TASK_DONE,
+            title: `${actor.name} completed a task`,
+            body: updated.title,
+            link: `/tasks/${updated.id}`,
+            meta: { taskId: updated.id, projectId: updated.projectId },
+          });
+        }
+      } else if (updated.assigneeId && updated.assigneeId !== actor.id) {
+        await notifications.create({
+          userId: updated.assigneeId,
+          type: notifications.NotificationType.TASK_STATUS_CHANGED,
+          title: `Task status changed to ${updated.status}`,
+          body: updated.title,
+          link: `/tasks/${updated.id}`,
+          meta: { taskId: updated.id, from: task.status, to: updated.status },
+        });
       }
     }
 
@@ -302,6 +332,16 @@ const updateTask = async (req, res, next) => {
         { assigneeId: updated.assignee.id }
       );
       await sendTaskAssigned({ to: updated.assignee.email, taskTitle: updated.title });
+      if (updated.assignee.id !== actor.id) {
+        await notifications.create({
+          userId: updated.assignee.id,
+          type: notifications.NotificationType.TASK_ASSIGNED,
+          title: `${actor.name} assigned you a task`,
+          body: updated.title,
+          link: `/tasks/${updated.id}`,
+          meta: { taskId: updated.id, projectId: updated.projectId, assignedBy: actor.id },
+        });
+      }
     }
 
     if (priority && priority !== task.priority) {
@@ -394,6 +434,25 @@ const updateTaskStatus = async (req, res, next) => {
 
     if (status === "DONE" && task.createdBy) {
       await sendTaskDone({ to: task.createdBy.email, taskTitle: updated.title });
+      if (task.createdBy.id !== actor.id) {
+        await notifications.create({
+          userId: task.createdBy.id,
+          type: notifications.NotificationType.TASK_DONE,
+          title: `${actor.name} completed a task`,
+          body: updated.title,
+          link: `/tasks/${updated.id}`,
+          meta: { taskId: updated.id, projectId: updated.projectId },
+        });
+      }
+    } else if (task.assigneeId && task.assigneeId !== actor.id) {
+      await notifications.create({
+        userId: task.assigneeId,
+        type: notifications.NotificationType.TASK_STATUS_CHANGED,
+        title: `Task status changed to ${status}`,
+        body: updated.title,
+        link: `/tasks/${updated.id}`,
+        meta: { taskId: updated.id, from: task.status, to: status },
+      });
     }
 
     res.json({ task: updated });
@@ -432,7 +491,10 @@ const deleteTask = async (req, res, next) => {
       task.projectId
     );
 
-    await prisma.task.delete({ where: { id: taskId } });
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { deletedAt: new Date() },
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -518,7 +580,7 @@ const addComment = async (req, res, next) => {
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { id: true, projectId: true },
+      select: { id: true, projectId: true, title: true, assigneeId: true, createdById: true },
     });
 
     if (!task) {
@@ -541,6 +603,23 @@ const addComment = async (req, res, next) => {
       },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+
+    const recipients = new Set();
+    if (task.assigneeId && task.assigneeId !== req.user.id) recipients.add(task.assigneeId);
+    if (task.createdById && task.createdById !== req.user.id) recipients.add(task.createdById);
+    if (recipients.size > 0) {
+      const preview = content.length > 120 ? `${content.slice(0, 117)}...` : content;
+      await notifications.createMany(
+        Array.from(recipients).map((userId) => ({
+          userId,
+          type: notifications.NotificationType.COMMENT_ADDED,
+          title: `${comment.user.name} commented on "${task.title}"`,
+          body: preview,
+          link: `/tasks/${task.id}`,
+          meta: { taskId: task.id, projectId: task.projectId, commentId: comment.id },
+        }))
+      );
+    }
 
     return res.status(201).json({ comment });
   } catch (error) {

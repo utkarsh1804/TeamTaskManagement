@@ -18,6 +18,9 @@ const TaskDetailPage = lazy(() => import("@/pages/tasks/TaskDetailPage"));
 const MembersPage = lazy(() => import("@/pages/members/MembersPage"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
 const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
+const OrgsPage = lazy(() => import("@/pages/orgs/OrgsPage"));
+const OrgDetailPage = lazy(() => import("@/pages/orgs/OrgDetailPage"));
+const AuditLogPage = lazy(() => import("@/pages/audit/AuditLogPage"));
 
 const wrap = (Page) => (
   <Suspense fallback={<PageSpinner />}>
@@ -46,6 +49,9 @@ const router = createBrowserRouter([
           { path: "notifications", element: wrap(NotificationsPage) },
           { path: "admin-requests", element: wrap(AdminRequestsPage) },
           { path: "profile", element: wrap(ProfilePage) },
+          { path: "orgs", element: wrap(OrgsPage) },
+          { path: "orgs/:id", element: wrap(OrgDetailPage) },
+          { path: "audit-log", element: wrap(AuditLogPage) },
         ],
       },
     ],

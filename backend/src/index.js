@@ -12,6 +12,7 @@ const projectsRoutes = require("./routes/projects.routes");
 const tasksRoutes = require("./routes/tasks.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const adminRoutes = require("./routes/admin.routes");
+const orgsRoutes = require("./routes/orgs.routes");
 const { startCron } = require("./lib/cron");
 
 const app = express();
@@ -63,6 +64,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
+app.use("/api/orgs", orgsRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 

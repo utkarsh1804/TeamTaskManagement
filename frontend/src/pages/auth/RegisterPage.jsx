@@ -22,7 +22,7 @@ const RegisterPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
-  const setUser = useAuthStore((state) => state.setUser);
+  const setSession = useAuthStore((state) => state.setSession);
 
   const {
     register,
@@ -34,10 +34,11 @@ const RegisterPage = () => {
     setError("");
     try {
       const { data } = await api.post("/auth/register", values);
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
-      setUser(data.user);
+      setSession({
+        user: data.user,
+        accessToken: data.accessToken || data.token,
+        refreshToken: data.refreshToken,
+      });
       navigate(location.state?.from || "/");
     } catch (err) {
       setError(err?.response?.data?.error || "Registration failed");

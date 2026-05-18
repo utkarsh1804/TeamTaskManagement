@@ -69,12 +69,75 @@ const commentSchema = z.object({
 });
 
 const profileUpdateSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name too long").optional(),
+  jobTitle: z.string().max(100, "Job title too long").optional().nullable(),
+  phone: z.string().max(50, "Phone too long").optional().nullable(),
+  timezone: z.string().max(60, "Timezone too long").optional().nullable(),
+  avatarUrl: z.string().url("Invalid URL").max(500).optional().nullable(),
 });
 
 const passwordUpdateSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: passwordSchema,
+});
+
+const slugSchema = z
+  .string()
+  .min(2, "Slug must be at least 2 characters")
+  .max(50, "Slug too long")
+  .regex(/^[a-z0-9-]+$/, "Slug can only contain lowercase letters, numbers, and hyphens");
+
+const orgCreateSchema = z.object({
+  name: z.string().min(2, "Name is required").max(120),
+  slug: slugSchema,
+  description: z.string().max(500).optional().nullable(),
+  logoUrl: z.string().url().max(500).optional().nullable(),
+});
+
+const orgUpdateSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  description: z.string().max(500).optional().nullable(),
+  logoUrl: z.string().url().max(500).optional().nullable(),
+});
+
+const orgMemberInviteSchema = z.object({
+  email: z.string().email("Invalid email"),
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "GUEST"]).default("MEMBER"),
+});
+
+const orgMemberRoleSchema = z.object({
+  role: z.enum(["OWNER", "ADMIN", "MEMBER", "GUEST"]),
+});
+
+const departmentCreateSchema = z.object({
+  name: z.string().min(2, "Name is required").max(120),
+  parentId: z.string().uuid().optional().nullable(),
+});
+
+const departmentUpdateSchema = departmentCreateSchema.partial();
+
+const teamCreateSchema = z.object({
+  name: z.string().min(2, "Name is required").max(120),
+  description: z.string().max(500).optional().nullable(),
+  departmentId: z.string().uuid().optional().nullable(),
+  leaderId: z.string().uuid().optional().nullable(),
+});
+
+const teamUpdateSchema = teamCreateSchema.partial();
+
+const teamMemberAddSchema = z.object({
+  userId: z.string().uuid(),
+});
+
+const integrationCreateSchema = z.object({
+  type: z.enum(["GITHUB", "SLACK", "WEBHOOK"]),
+  config: z.record(z.any()),
+  enabled: z.boolean().optional(),
+});
+
+const integrationUpdateSchema = z.object({
+  config: z.record(z.any()).optional(),
+  enabled: z.boolean().optional(),
 });
 
 module.exports = {
@@ -86,6 +149,17 @@ module.exports = {
   memberRoleSchema,
   taskCreateSchema,
   taskUpdateSchema,
+  orgCreateSchema,
+  orgUpdateSchema,
+  orgMemberInviteSchema,
+  orgMemberRoleSchema,
+  departmentCreateSchema,
+  departmentUpdateSchema,
+  teamCreateSchema,
+  teamUpdateSchema,
+  teamMemberAddSchema,
+  integrationCreateSchema,
+  integrationUpdateSchema,
   taskStatusSchema,
   adminRequestSchema,
   inviteLinkSchema,

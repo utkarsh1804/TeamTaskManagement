@@ -19,6 +19,13 @@ enum AdminRequestStatus {
   REJECTED
 }
 
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
 enum ProjectRole {
   ADMIN
   MEMBER
@@ -43,61 +50,187 @@ enum Priority {
   URGENT
 }
 
+enum IntegrationType {
+  GITHUB
+  SLACK
+  WEBHOOK
+}
+
 model User {
   id           String         @id @default(uuid())
   name         String
   email        String         @unique
   passwordHash String
   globalRole   GlobalRole
+  avatarUrl    String?
+  jobTitle     String?
+  phone        String?
+  timezone     String?
+  departmentId String?
   createdAt    DateTime       @default(now())
+  deletedAt    DateTime?
 
-  projects      Project[]      @relation("ProjectOwner")
-  memberships   ProjectMember[]
-  assignedTasks Task[]         @relation("TaskAssignee")
-  createdTasks  Task[]         @relation("TaskCreator")
-  activityLogs  ActivityLog[]
-  reviewedAdminRequests AdminRequest[] @relation("AdminReviewer")
+  department            Department?          @relation(fields: [departmentId], references: [id])
+  projects              Project[]            @relation("ProjectOwner")
+  memberships           ProjectMember[]
+  orgMemberships        OrgMember[]
+  teamMemberships       TeamMember[]
+  ledTeams              Team[]               @relation("TeamLeader")
+  assignedTasks         Task[]               @relation("TaskAssignee")
+  createdTasks          Task[]               @relation("TaskCreator")
+  activityLogs          ActivityLog[]
+  notifications         Notification[]
+  refreshTokens         RefreshToken[]
+  createdIntegrations   ProjectIntegration[] @relation("IntegrationCreator")
+  reviewedAdminRequests AdminRequest[]       @relation("AdminReviewer")
+
+  @@index([deletedAt])
+  @@index([departmentId])
+}
+
+model Organization {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  description String?
+  logoUrl     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  members     OrgMember[]
+  departments Department[]
+  teams       Team[]
+  projects    Project[]
+
+  @@index([deletedAt])
+}
+
+model OrgMember {
+  id       String   @id @default(uuid())
+  userId   String
+  orgId    String
+  role     OrgRole  @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id])
+  org  Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@index([userId])
+}
+
+model Department {
+  id        String    @id @default(uuid())
+  name      String
+  orgId     String
+  parentId  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  parent   Department?  @relation("DeptHierarchy", fields: [parentId], references: [id])
+  children Department[] @relation("DeptHierarchy")
+  teams    Team[]
+  users    User[]
+  projects Project[]
+
+  @@index([orgId])
+  @@index([parentId])
+}
+
+model Team {
+  id           String    @id @default(uuid())
+  name         String
+  description  String?
+  orgId        String
+  departmentId String?
+  leaderId     String?
+  createdAt    DateTime  @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  org        Organization @relation(fields: [orgId], references: [id])
+  department Department?  @relation(fields: [departmentId], references: [id])
+  leader     User?        @relation("TeamLeader", fields: [leaderId], references: [id])
+  members    TeamMember[]
+  projects   Project[]
+
+  @@index([orgId])
+  @@index([departmentId])
+  @@index([leaderId])
+}
+
+model TeamMember {
+  id       String   @id @default(uuid())
+  teamId   String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
 }
 
 model Project {
-  id          String         @id @default(uuid())
-  name        String
-  description String?
-  status      ProjectStatus @default(ACTIVE)
-  ownerId     String
-  owner       User          @relation("ProjectOwner", fields: [ownerId], references: [id])
-  members     ProjectMember[]
-  tasks       Task[]
+  id           String         @id @default(uuid())
+  name         String
+  description  String?
+  status       ProjectStatus  @default(ACTIVE)
+  ownerId      String
+  orgId        String?
+  departmentId String?
+  teamId       String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  owner        User           @relation("ProjectOwner", fields: [ownerId], references: [id])
+  org          Organization?  @relation(fields: [orgId], references: [id])
+  department   Department?    @relation(fields: [departmentId], references: [id])
+  team         Team?          @relation(fields: [teamId], references: [id])
+  members      ProjectMember[]
+  tasks        Task[]
   activityLogs ActivityLog[]
-  inviteLinks InviteLink[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  inviteLinks  InviteLink[]
+  integrations ProjectIntegration[]
 
   @@index([ownerId])
+  @@index([orgId])
+  @@index([departmentId])
+  @@index([teamId])
   @@index([status])
+  @@index([deletedAt])
 }
 
 model Task {
-  id          String      @id @default(uuid())
+  id          String     @id @default(uuid())
   title       String
   description String?
-  status      TaskStatus  @default(TODO)
-  priority    Priority    @default(MEDIUM)
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
   dueDate     DateTime?
   projectId   String
   assigneeId  String?
   createdById String
 
-  project     Project     @relation(fields: [projectId], references: [id])
-  assignee    User?       @relation("TaskAssignee", fields: [assigneeId], references: [id])
-  createdBy   User        @relation("TaskCreator", fields: [createdById], references: [id])
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  project   Project @relation(fields: [projectId], references: [id])
+  assignee  User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy User    @relation("TaskCreator", fields: [createdById], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([projectId])
   @@index([assigneeId])
   @@index([status])
   @@index([projectId, status])
+  @@index([deletedAt])
 }
 
 model ProjectMember {
@@ -107,8 +240,8 @@ model ProjectMember {
   role      ProjectRole
   joinedAt  DateTime    @default(now())
 
-  user     User    @relation(fields: [userId], references: [id])
-  project  Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 
   @@unique([userId, projectId])
   @@index([userId])
@@ -131,29 +264,82 @@ model ActivityLog {
   @@index([projectId])
   @@index([userId])
   @@index([createdAt])
+  @@index([entityType, entityId])
 }
 
 model AdminRequest {
-  id        String             @id @default(uuid())
-  name      String
-  email     String             @unique
+  id           String             @id @default(uuid())
+  name         String
+  email        String             @unique
   passwordHash String
-  status    AdminRequestStatus @default(PENDING)
-  reviewedBy String?
-  reviewer  User?              @relation("AdminReviewer", fields: [reviewedBy], references: [id])
-  createdAt DateTime           @default(now())
-  reviewedAt DateTime?
+  status       AdminRequestStatus @default(PENDING)
+  reviewedBy   String?
+  reviewer     User?              @relation("AdminReviewer", fields: [reviewedBy], references: [id])
+  createdAt    DateTime           @default(now())
+  reviewedAt   DateTime?
 }
 
 model InviteLink {
-  id        String   @id @default(uuid())
-  token     String   @unique
+  id        String      @id @default(uuid())
+  token     String      @unique
   projectId String
   email     String?
   role      ProjectRole
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
   project Project @relation(fields: [projectId], references: [id])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  body      String?
+  link      String?
+  meta      Json?
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid())
+  tokenHash    String    @unique
+  userId       String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model ProjectIntegration {
+  id          String          @id @default(uuid())
+  projectId   String
+  type        IntegrationType
+  config      Json
+  enabled     Boolean         @default(true)
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  createdBy User    @relation("IntegrationCreator", fields: [createdById], references: [id])
+
+  @@unique([projectId, type])
+  @@index([projectId])
 }

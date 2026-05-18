@@ -1,6 +1,7 @@
 const prisma = require("../lib/prisma");
 const { logActivity } = require("../lib/activityLog");
 const { sendProjectInvite } = require("../lib/resend");
+const notifications = require("../lib/notifications");
 
 const userSelect = {
   id: true,
@@ -201,11 +202,29 @@ const deleteProject = async (req, res, next) => {
       project.id
     );
 
+    const now = new Date();
     await prisma.$transaction([
-      prisma.task.deleteMany({ where: { projectId } }),
-      prisma.projectMember.deleteMany({ where: { projectId } }),
-      prisma.project.delete({ where: { id: projectId } }),
+      prisma.task.updateMany({ where: { projectId, deletedAt: null }, data: { deletedAt: now } }),
+      prisma.project.update({ where: { id: projectId }, data: { deletedAt: now } }),
     ]);
+
+    const memberIds = await prisma.projectMember.findMany({
+      where: { projectId },
+      select: { userId: true },
+    });
+    const recipients = memberIds.map((m) => m.userId).filter((id) => id !== req.user.id);
+    if (recipients.length > 0) {
+      await notifications.createMany(
+        recipients.map((userId) => ({
+          userId,
+          type: notifications.NotificationType.PROJECT_DELETED,
+          title: `Project "${project.name}" was deleted`,
+          body: `Deleted by ${actor.name}`,
+          link: `/projects`,
+          meta: { projectId },
+        }))
+      );
+    }
 
     res.json({ success: true });
   } catch (error) {
@@ -268,6 +287,15 @@ const addMember = async (req, res, next) => {
 
     await sendProjectInvite({ to: user.email, projectName: project.name });
 
+    await notifications.create({
+      userId: user.id,
+      type: notifications.NotificationType.PROJECT_MEMBER_ADDED,
+      title: `You were added to "${project.name}"`,
+      body: `${actor.name} added you as ${role}`,
+      link: `/projects/${project.id}`,
+      meta: { projectId: project.id, role, addedBy: actor.id },
+    });
+
     res.status(201).json({ member: membership });
   } catch (error) {
     next(error);
@@ -324,6 +352,17 @@ const updateMemberRole = async (req, res, next) => {
       { role }
     );
 
+    if (userId !== actor.id) {
+      await notifications.create({
+        userId,
+        type: notifications.NotificationType.PROJECT_MEMBER_ROLE_CHANGED,
+        title: `Your role changed in "${project.name}"`,
+        body: `${actor.name} set your role to ${role}`,
+        link: `/projects/${project.id}`,
+        meta: { projectId: project.id, role },
+      });
+    }
+
     res.json({ member: updated });
   } catch (error) {
     next(error);
@@ -364,19 +403,32 @@ const removeMember = async (req, res, next) => {
 
     await prisma.projectMember.delete({ where: { id: membership.id } });
 
-    getActor(req.user.id).then((actor) => {
-      prisma.user.findUnique({ where: { id: userId }, select: { name: true } }).then((removed) => {
-        if (actor && removed) {
-          logActivity(
-            `${actor.name} removed ${removed.name} from project "${project.name}"`,
-            "ProjectMember",
-            membership.id,
-            req.user.id,
-            projectId
-          );
-        }
-      });
+    const actor = await getActor(req.user.id);
+    const removed = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
     });
+
+    if (actor && removed) {
+      await logActivity(
+        `${actor.name} removed ${removed.name} from project "${project.name}"`,
+        "ProjectMember",
+        membership.id,
+        req.user.id,
+        projectId
+      );
+    }
+
+    if (userId !== req.user.id) {
+      await notifications.create({
+        userId,
+        type: notifications.NotificationType.PROJECT_MEMBER_REMOVED,
+        title: `Removed from "${project.name}"`,
+        body: actor ? `${actor.name} removed you from the project` : null,
+        link: `/projects`,
+        meta: { projectId },
+      });
+    }
 
     res.json({ success: true });
   } catch (error) {

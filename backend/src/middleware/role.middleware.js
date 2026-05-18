@@ -85,8 +85,85 @@ const requireProjectAdmin = async (req, res, next) => {
   }
 };
 
+const getOrgId = (req) => req.params.orgId || req.params.id;
+
+const requireOrgMember = async (req, res, next) => {
+  try {
+    if (req.user?.globalRole === "ADMIN") return next();
+    const orgId = getOrgId(req);
+    if (!orgId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Org ID missing", code: "BAD_REQUEST" });
+    }
+    const membership = await prisma.orgMember.findUnique({
+      where: { userId_orgId: { userId: req.user.id, orgId } },
+    });
+    if (!membership) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+    }
+    req.orgMembership = membership;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const requireOrgAdmin = async (req, res, next) => {
+  try {
+    if (req.user?.globalRole === "ADMIN") return next();
+    const orgId = getOrgId(req);
+    if (!orgId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Org ID missing", code: "BAD_REQUEST" });
+    }
+    const membership = await prisma.orgMember.findUnique({
+      where: { userId_orgId: { userId: req.user.id, orgId } },
+    });
+    if (!membership || (membership.role !== "OWNER" && membership.role !== "ADMIN")) {
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+    }
+    req.orgMembership = membership;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const requireOrgOwner = async (req, res, next) => {
+  try {
+    if (req.user?.globalRole === "ADMIN") return next();
+    const orgId = getOrgId(req);
+    if (!orgId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Org ID missing", code: "BAD_REQUEST" });
+    }
+    const membership = await prisma.orgMember.findUnique({
+      where: { userId_orgId: { userId: req.user.id, orgId } },
+    });
+    if (!membership || membership.role !== "OWNER") {
+      return res
+        .status(403)
+        .json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+    }
+    req.orgMembership = membership;
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   requireGlobalAdmin,
   requireProjectAccess,
   requireProjectAdmin,
+  requireOrgMember,
+  requireOrgAdmin,
+  requireOrgOwner,
 };

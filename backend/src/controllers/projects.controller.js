@@ -19,18 +19,31 @@ const getActor = (userId) =>
 const listProjects = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const projects = await prisma.project.findMany({
-      where: {
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      include: {
-        owner: { select: userSelect },
-        _count: { select: { tasks: true, members: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const search = req.query.search;
 
-    res.json({ items: projects });
+    const where = {
+      OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+    };
+
+    const [projects, total] = await prisma.$transaction([
+      prisma.project.findMany({
+        where,
+        include: {
+          owner: { select: userSelect },
+          _count: { select: { tasks: true, members: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.project.count({ where }),
+    ]);
+
+    res.json({ items: projects, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     next(error);
   }

@@ -198,9 +198,10 @@ const getTask = async (req, res, next) => {
     }
 
     const activityLog = await prisma.activityLog.findMany({
-      where: { entityType: "Task", entityId: task.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      where: { entityId: task.id, entityType: { in: ["Task", "Comment"] } },
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+      take: 100,
     });
 
     res.json({ task, activityLog });
@@ -510,6 +511,43 @@ const listOverdueTasks = async (req, res, next) => {
   }
 };
 
+const addComment = async (req, res, next) => {
+  try {
+    const taskId = req.params.id;
+    const { content } = req.body;
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, projectId: true },
+    });
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: "Task not found", code: "NOT_FOUND" });
+    }
+
+    const access = await getProjectAccess(task.projectId, req.user.id, req.user.globalRole);
+    if (!access.isMember) {
+      return res.status(403).json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+    }
+
+    const comment = await prisma.activityLog.create({
+      data: {
+        action: content,
+        entityType: "Comment",
+        entityId: taskId,
+        userId: req.user.id,
+        projectId: task.projectId,
+        meta: { isComment: true },
+      },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+
+    return res.status(201).json({ comment });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   listProjectTasks,
   listMyTasks,
@@ -519,4 +557,5 @@ module.exports = {
   updateTaskStatus,
   deleteTask,
   listOverdueTasks,
+  addComment,
 };

@@ -2,7 +2,7 @@ const express = require("express");
 
 const authMiddleware = require("../middleware/auth.middleware");
 const validate = require("../middleware/validate.middleware");
-const { taskUpdateSchema, taskStatusSchema } = require("../lib/schemas");
+const { taskUpdateSchema, taskStatusSchema, commentSchema } = require("../lib/schemas");
 const {
   getTask,
   updateTask,
@@ -10,6 +10,7 @@ const {
   deleteTask,
   listOverdueTasks,
   listMyTasks,
+  addComment,
 } = require("../controllers/tasks.controller");
 
 const router = express.Router();
@@ -22,5 +23,6 @@ router.get("/:id", getTask);
 router.patch("/:id", validate(taskUpdateSchema), updateTask);
 router.patch("/:id/status", validate(taskStatusSchema), updateTaskStatus);
 router.delete("/:id", deleteTask);
+router.post("/:id/comments", validate(commentSchema), addComment);
 
 module.exports = router;

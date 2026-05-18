@@ -17,6 +17,7 @@ const MyTasksPage = lazy(() => import("@/pages/tasks/MyTasksPage"));
 const TaskDetailPage = lazy(() => import("@/pages/tasks/TaskDetailPage"));
 const MembersPage = lazy(() => import("@/pages/members/MembersPage"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
+const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 
 const wrap = (Page) => (
   <Suspense fallback={<PageSpinner />}>
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
           { path: "members", element: wrap(MembersPage) },
           { path: "notifications", element: wrap(NotificationsPage) },
           { path: "admin-requests", element: wrap(AdminRequestsPage) },
+          { path: "profile", element: wrap(ProfilePage) },
         ],
       },
     ],

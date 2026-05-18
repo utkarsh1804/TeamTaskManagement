@@ -125,9 +125,52 @@ const getMe = async (req, res, next) => {
   }
 };
 
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    const user = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { name },
+      select: userSelect,
+    });
+    return res.json({ user });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: "User not found", code: "NOT_FOUND" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, existing.passwordHash);
+    if (!isMatch) {
+      return res.status(400).json({
+        success: false,
+        error: "Current password is incorrect",
+        code: "INVALID_CREDENTIALS",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
+
+    return res.json({ success: true, message: "Password updated successfully" });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
   getMe,
+  updateProfile,
+  updatePassword,
 };

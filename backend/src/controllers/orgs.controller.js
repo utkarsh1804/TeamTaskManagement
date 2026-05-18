@@ -481,6 +481,61 @@ const removeTeamMember = async (req, res, next) => {
   }
 };
 
+// ---------------- Tags ----------------
+
+const listTags = async (req, res, next) => {
+  try {
+    const items = await prisma.tag.findMany({
+      where: { orgId: req.params.id },
+      orderBy: { name: "asc" },
+    });
+    res.json({ items });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createTag = async (req, res, next) => {
+  try {
+    const tag = await prisma.tag.create({
+      data: {
+        orgId: req.params.id,
+        name: req.body.name,
+        color: req.body.color || "#6b7280",
+      },
+    });
+    res.status(201).json({ tag });
+  } catch (error) {
+    if (error.code === "P2002") {
+      return res
+        .status(409)
+        .json({ success: false, error: "Tag name already exists", code: "CONFLICT" });
+    }
+    next(error);
+  }
+};
+
+const updateTag = async (req, res, next) => {
+  try {
+    const tag = await prisma.tag.update({
+      where: { id: req.params.tagId },
+      data: req.body,
+    });
+    res.json({ tag });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteTag = async (req, res, next) => {
+  try {
+    await prisma.tag.delete({ where: { id: req.params.tagId } });
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listMyOrgs,
   createOrg,
@@ -502,4 +557,8 @@ module.exports = {
   deleteTeam,
   addTeamMember,
   removeTeamMember,
+  listTags,
+  createTag,
+  updateTag,
+  deleteTag,
 };

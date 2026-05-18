@@ -40,6 +40,11 @@ const taskBaseSchema = z.object({
   status: z.enum(["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"]),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
   dueDate: z.string().datetime().optional().nullable(),
+  startDate: z.string().datetime().optional().nullable(),
+  estimatedHours: z.number().nonnegative().max(99999).optional().nullable(),
+  storyPoints: z.number().int().nonnegative().max(999).optional().nullable(),
+  recurrenceRule: z.string().max(500).optional().nullable(),
+  parentId: z.string().uuid().optional().nullable(),
   assigneeId: z.string().uuid().optional().nullable(),
 });
 
@@ -140,6 +145,39 @@ const integrationUpdateSchema = z.object({
   enabled: z.boolean().optional(),
 });
 
+const checklistItemSchema = z.object({
+  title: z.string().min(1, "Title required").max(300),
+  done: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+
+const checklistItemUpdateSchema = checklistItemSchema.partial();
+
+const tagCreateSchema = z.object({
+  name: z.string().min(1).max(40),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Color must be a hex like #6b7280")
+    .optional(),
+});
+
+const tagUpdateSchema = tagCreateSchema.partial();
+
+const taskTagSchema = z.object({
+  tagId: z.string().uuid(),
+});
+
+const dependencyCreateSchema = z.object({
+  blockingId: z.string().uuid(),
+});
+
+const attachmentCreateSchema = z.object({
+  url: z.string().url().max(1000),
+  name: z.string().min(1).max(200),
+  size: z.number().int().nonnegative().max(2_000_000_000),
+  mimeType: z.string().min(1).max(100),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -160,6 +198,13 @@ module.exports = {
   teamMemberAddSchema,
   integrationCreateSchema,
   integrationUpdateSchema,
+  checklistItemSchema,
+  checklistItemUpdateSchema,
+  tagCreateSchema,
+  tagUpdateSchema,
+  taskTagSchema,
+  dependencyCreateSchema,
+  attachmentCreateSchema,
   taskStatusSchema,
   adminRequestSchema,
   inviteLinkSchema,

@@ -82,6 +82,7 @@ model User {
   notifications         Notification[]
   refreshTokens         RefreshToken[]
   createdIntegrations   ProjectIntegration[] @relation("IntegrationCreator")
+  uploadedAttachments   Attachment[]         @relation("AttachmentUploader")
   reviewedAdminRequests AdminRequest[]       @relation("AdminReviewer")
 
   @@index([deletedAt])
@@ -102,6 +103,7 @@ model Organization {
   departments Department[]
   teams       Team[]
   projects    Project[]
+  tags        Tag[]
 
   @@index([deletedAt])
 }
@@ -199,6 +201,7 @@ model Project {
   activityLogs ActivityLog[]
   inviteLinks  InviteLink[]
   integrations ProjectIntegration[]
+  attachments  Attachment[]
 
   @@index([ownerId])
   @@index([orgId])
@@ -209,19 +212,33 @@ model Project {
 }
 
 model Task {
-  id          String     @id @default(uuid())
-  title       String
-  description String?
-  status      TaskStatus @default(TODO)
-  priority    Priority   @default(MEDIUM)
-  dueDate     DateTime?
-  projectId   String
-  assigneeId  String?
-  createdById String
+  id             String     @id @default(uuid())
+  title          String
+  description    String?
+  status         TaskStatus @default(TODO)
+  priority       Priority   @default(MEDIUM)
+  dueDate        DateTime?
+  startDate      DateTime?
+  estimatedHours Decimal?   @db.Decimal(6, 2)
+  storyPoints    Int?
+  recurrenceRule String?
+  projectId      String
+  assigneeId     String?
+  createdById    String
+  parentId       String?
 
   project   Project @relation(fields: [projectId], references: [id])
   assignee  User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
   createdBy User    @relation("TaskCreator", fields: [createdById], references: [id])
+  parent    Task?   @relation("TaskHierarchy", fields: [parentId], references: [id])
+  subtasks  Task[]  @relation("TaskHierarchy")
+
+  checklistItems    ChecklistItem[]
+  taskTags          TaskTag[]
+  attachments       Attachment[]
+  blockedBy         TaskDependency[] @relation("BlockedTask")
+  blocking          TaskDependency[] @relation("BlockingTask")
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -230,7 +247,80 @@ model Task {
   @@index([assigneeId])
   @@index([status])
   @@index([projectId, status])
+  @@index([parentId])
   @@index([deletedAt])
+}
+
+model ChecklistItem {
+  id        String   @id @default(uuid())
+  taskId    String
+  title     String
+  done      Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task Task @relation(fields: [taskId], references: [id])
+
+  @@index([taskId])
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  orgId     String
+  name      String
+  color     String   @default("#6b7280")
+  createdAt DateTime @default(now())
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  taskTags TaskTag[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+
+  task Task @relation(fields: [taskId], references: [id])
+  tag  Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([taskId, tagId])
+  @@index([tagId])
+}
+
+model TaskDependency {
+  id         String   @id @default(uuid())
+  blockingId String
+  blockedId  String
+  createdAt  DateTime @default(now())
+
+  blocking Task @relation("BlockingTask", fields: [blockingId], references: [id])
+  blocked  Task @relation("BlockedTask", fields: [blockedId], references: [id])
+
+  @@unique([blockingId, blockedId])
+  @@index([blockingId])
+  @@index([blockedId])
+}
+
+model Attachment {
+  id           String   @id @default(uuid())
+  taskId       String?
+  projectId    String?
+  url          String
+  name         String
+  size         Int
+  mimeType     String
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  task       Task?    @relation(fields: [taskId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id])
+  uploadedBy User     @relation("AttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([taskId])
+  @@index([projectId])
 }
 
 model ProjectMember {

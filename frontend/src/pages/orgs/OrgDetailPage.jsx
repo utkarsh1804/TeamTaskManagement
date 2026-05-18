@@ -9,6 +9,7 @@ import {
   Plus,
   Trash2,
   ChevronLeft,
+  Tag as TagIcon,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -18,6 +19,7 @@ const TABS = [
   { id: "members", label: "Members", icon: Users },
   { id: "departments", label: "Departments", icon: Network },
   { id: "teams", label: "Teams", icon: Layers },
+  { id: "tags", label: "Tags", icon: TagIcon },
 ];
 
 const OrgDetailPage = () => {
@@ -87,7 +89,94 @@ const OrgDetailPage = () => {
         <DepartmentsPanel orgId={id} canManage={canManage} />
       )}
       {tab === "teams" && <TeamsPanel orgId={id} canManage={canManage} />}
+      {tab === "tags" && <TagsPanel orgId={id} canManage={canManage} />}
     </section>
+  );
+};
+
+const TagsPanel = ({ orgId, canManage }) => {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [color, setColor] = useState("#6b7280");
+
+  const { data } = useQuery({
+    queryKey: ["org-tags", orgId],
+    queryFn: async () => (await api.get(`/orgs/${orgId}/tags`)).data,
+  });
+
+  const create = useMutation({
+    mutationFn: (payload) => api.post(`/orgs/${orgId}/tags`, payload),
+    onSuccess: () => {
+      setName("");
+      qc.invalidateQueries({ queryKey: ["org-tags", orgId] });
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (tagId) => api.delete(`/orgs/${orgId}/tags/${tagId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["org-tags", orgId] }),
+  });
+
+  const tags = data?.items || [];
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6">
+      {canManage && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name) create.mutate({ name, color });
+          }}
+          className="mb-4 flex flex-wrap gap-2"
+        >
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Tag name"
+            className="flex-1 min-w-[160px] rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          />
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="h-9 w-12 cursor-pointer rounded-lg border border-input"
+          />
+          <Button type="submit" disabled={create.isPending}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add
+          </Button>
+        </form>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {tags.map((t) => (
+          <span
+            key={t.id}
+            className="group inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
+            style={{ backgroundColor: `${t.color}22`, color: t.color }}
+          >
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: t.color }}
+            />
+            {t.name}
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Delete tag "${t.name}"?`)) remove.mutate(t.id);
+                }}
+                className="opacity-0 group-hover:opacity-100"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        ))}
+        {tags.length === 0 && (
+          <p className="text-sm text-muted-foreground">No tags yet.</p>
+        )}
+      </div>
+    </div>
   );
 };
 

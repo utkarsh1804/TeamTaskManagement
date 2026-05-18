@@ -17,6 +17,8 @@ const {
   teamCreateSchema,
   teamUpdateSchema,
   teamMemberAddSchema,
+  tagCreateSchema,
+  tagUpdateSchema,
 } = require("../lib/schemas");
 const {
   listMyOrgs,
@@ -39,6 +41,10 @@ const {
   deleteTeam,
   addTeamMember,
   removeTeamMember,
+  listTags,
+  createTag,
+  updateTag,
+  deleteTag,
 } = require("../controllers/orgs.controller");
 
 const router = express.Router();
@@ -106,5 +112,16 @@ router.delete(
   requireOrgAdmin,
   removeTeamMember
 );
+
+// Tags
+router.get("/:id/tags", requireOrgMember, listTags);
+router.post("/:id/tags", requireOrgAdmin, validate(tagCreateSchema), createTag);
+router.patch(
+  "/:id/tags/:tagId",
+  requireOrgAdmin,
+  validate(tagUpdateSchema),
+  updateTag
+);
+router.delete("/:id/tags/:tagId", requireOrgAdmin, deleteTag);
 
 module.exports = router;

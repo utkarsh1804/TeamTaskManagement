@@ -9,6 +9,7 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import TaskExtras from "@/components/tasks/TaskExtras";
 
 const statusStyles = {
   TODO: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
@@ -214,6 +215,9 @@ const TaskDetailPage = () => {
           </select>
         </div>
       </div>
+
+      {/* Task extras: checklist, tags, subtasks, dependencies, attachments */}
+      <TaskExtras taskId={id} orgId={task.project?.orgId} />
 
       {/* Comments */}
       <div className="rounded-2xl border border-border bg-card p-6">

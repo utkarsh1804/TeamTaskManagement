@@ -100,7 +100,19 @@ const listProjectTasks = async (req, res, next) => {
 const createTask = async (req, res, next) => {
   try {
     const projectId = req.params.id;
-    const { title, description, status, priority, dueDate, assigneeId } = req.body;
+    const {
+      title,
+      description,
+      status,
+      priority,
+      dueDate,
+      startDate,
+      estimatedHours,
+      storyPoints,
+      recurrenceRule,
+      parentId,
+      assigneeId,
+    } = req.body;
 
     const access = await getProjectAccess(projectId, req.user.id, req.user.globalRole);
     if (!access.project || !access.isMember) {
@@ -128,6 +140,20 @@ const createTask = async (req, res, next) => {
       }
     }
 
+    if (parentId) {
+      const parent = await prisma.task.findUnique({
+        where: { id: parentId },
+        select: { projectId: true },
+      });
+      if (!parent || parent.projectId !== projectId) {
+        return res.status(400).json({
+          success: false,
+          error: "Parent task must be in the same project",
+          code: "BAD_REQUEST",
+        });
+      }
+    }
+
     const task = await prisma.task.create({
       data: {
         title,
@@ -135,6 +161,11 @@ const createTask = async (req, res, next) => {
         status,
         priority,
         dueDate: dueDate ? new Date(dueDate) : null,
+        startDate: startDate ? new Date(startDate) : null,
+        estimatedHours: estimatedHours ?? null,
+        storyPoints: storyPoints ?? null,
+        recurrenceRule: recurrenceRule || null,
+        parentId: parentId || null,
         projectId,
         assigneeId: assigneeId || null,
         createdById: req.user.id,
@@ -189,9 +220,20 @@ const getTask = async (req, res, next) => {
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
-        project: { select: { id: true, name: true, ownerId: true } },
+        project: { select: { id: true, name: true, ownerId: true, orgId: true } },
         assignee: { select: userSelect },
         createdBy: { select: userSelect },
+        parent: { select: { id: true, title: true, status: true } },
+        taskTags: { include: { tag: true } },
+        _count: {
+          select: {
+            subtasks: true,
+            checklistItems: true,
+            attachments: true,
+            blockedBy: true,
+            blocking: true,
+          },
+        },
       },
     });
 
@@ -224,7 +266,19 @@ const getTask = async (req, res, next) => {
 const updateTask = async (req, res, next) => {
   try {
     const taskId = req.params.id;
-    const { title, description, status, priority, dueDate, assigneeId } = req.body;
+    const {
+      title,
+      description,
+      status,
+      priority,
+      dueDate,
+      startDate,
+      estimatedHours,
+      storyPoints,
+      recurrenceRule,
+      parentId,
+      assigneeId,
+    } = req.body;
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
@@ -275,6 +329,11 @@ const updateTask = async (req, res, next) => {
     if (status !== undefined) updates.status = status;
     if (priority !== undefined) updates.priority = priority;
     if (dueDate !== undefined) updates.dueDate = dueDate ? new Date(dueDate) : null;
+    if (startDate !== undefined) updates.startDate = startDate ? new Date(startDate) : null;
+    if (estimatedHours !== undefined) updates.estimatedHours = estimatedHours;
+    if (storyPoints !== undefined) updates.storyPoints = storyPoints;
+    if (recurrenceRule !== undefined) updates.recurrenceRule = recurrenceRule || null;
+    if (parentId !== undefined) updates.parentId = parentId || null;
     if (assigneeId !== undefined) updates.assigneeId = assigneeId || null;
 
     const updated = await prisma.task.update({

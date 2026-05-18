@@ -270,12 +270,32 @@ const acceptInviteLink = async (req, res, next) => {
 
 const listAllUsers = async (req, res, next) => {
   try {
-    const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, globalRole: true },
-      orderBy: { name: "asc" },
-    });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const search = req.query.search;
 
-    return res.json({ items: users });
+    const where = search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { email: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+    const [users, total] = await prisma.$transaction([
+      prisma.user.findMany({
+        where,
+        select: { id: true, name: true, email: true, globalRole: true, createdAt: true },
+        orderBy: { name: "asc" },
+        skip,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return res.json({ items: users, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     return next(error);
   }

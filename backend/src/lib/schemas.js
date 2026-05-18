@@ -64,6 +64,19 @@ const emailInviteSchema = z.object({
   role: z.enum(["ADMIN", "MEMBER"]).optional(),
 });
 
+const commentSchema = z.object({
+  content: z.string().min(1, "Comment cannot be empty").max(2000, "Comment too long"),
+});
+
+const profileUpdateSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100, "Name too long"),
+});
+
+const passwordUpdateSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: passwordSchema,
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -77,4 +90,7 @@ module.exports = {
   adminRequestSchema,
   inviteLinkSchema,
   emailInviteSchema,
+  commentSchema,
+  profileUpdateSchema,
+  passwordUpdateSchema,
 };

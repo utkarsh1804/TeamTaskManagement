@@ -61,6 +61,9 @@ const listProjectTasks = async (req, res, next) => {
   try {
     const projectId = req.params.id;
     const { status, assignee, priority, sort, search } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
 
     const where = { projectId };
     if (status) where.status = status;
@@ -72,17 +75,22 @@ const listProjectTasks = async (req, res, next) => {
     if (sort === "dueDate") orderBy = { dueDate: "asc" };
     if (sort === "priority") orderBy = { priority: "desc" };
 
-    const tasks = await prisma.task.findMany({
-      where,
-      include: {
-        project: { select: { id: true, name: true } },
-        assignee: { select: userSelect },
-        createdBy: { select: userSelect },
-      },
-      orderBy,
-    });
+    const [tasks, total] = await prisma.$transaction([
+      prisma.task.findMany({
+        where,
+        include: {
+          project: { select: { id: true, name: true } },
+          assignee: { select: userSelect },
+          createdBy: { select: userSelect },
+        },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.task.count({ where }),
+    ]);
 
-    res.json({ items: tasks });
+    res.json({ items: tasks, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     next(error);
   }
@@ -190,9 +198,10 @@ const getTask = async (req, res, next) => {
     }
 
     const activityLog = await prisma.activityLog.findMany({
-      where: { entityType: "Task", entityId: task.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      where: { entityId: task.id, entityType: { in: ["Task", "Comment"] } },
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+      take: 100,
     });
 
     res.json({ task, activityLog });
@@ -434,27 +443,36 @@ const deleteTask = async (req, res, next) => {
 const listMyTasks = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    const projects = await prisma.project.findMany({
-      where: { OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-      select: { id: true },
-    });
+    const { status, priority, sort, search } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
 
-    const projectIds = projects.map((project) => project.id);
-    if (projectIds.length === 0) {
-      return res.json({ items: [] });
-    }
+    const where = { assigneeId: userId };
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
+    if (search) where.title = { contains: search, mode: "insensitive" };
 
-    const tasks = await prisma.task.findMany({
-      where: { projectId: { in: projectIds } },
-      include: {
-        project: { select: { id: true, name: true } },
-        assignee: { select: userSelect },
-        createdBy: { select: userSelect },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    let orderBy = { createdAt: "desc" };
+    if (sort === "dueDate") orderBy = { dueDate: "asc" };
+    if (sort === "priority") orderBy = { priority: "desc" };
 
-    res.json({ items: tasks });
+    const [tasks, total] = await prisma.$transaction([
+      prisma.task.findMany({
+        where,
+        include: {
+          project: { select: { id: true, name: true } },
+          assignee: { select: userSelect },
+          createdBy: { select: userSelect },
+        },
+        orderBy,
+        skip,
+        take: limit,
+      }),
+      prisma.task.count({ where }),
+    ]);
+
+    res.json({ items: tasks, total, page, limit, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     next(error);
   }
@@ -493,6 +511,43 @@ const listOverdueTasks = async (req, res, next) => {
   }
 };
 
+const addComment = async (req, res, next) => {
+  try {
+    const taskId = req.params.id;
+    const { content } = req.body;
+
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, projectId: true },
+    });
+
+    if (!task) {
+      return res.status(404).json({ success: false, error: "Task not found", code: "NOT_FOUND" });
+    }
+
+    const access = await getProjectAccess(task.projectId, req.user.id, req.user.globalRole);
+    if (!access.isMember) {
+      return res.status(403).json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+    }
+
+    const comment = await prisma.activityLog.create({
+      data: {
+        action: content,
+        entityType: "Comment",
+        entityId: taskId,
+        userId: req.user.id,
+        projectId: task.projectId,
+        meta: { isComment: true },
+      },
+      include: { user: { select: { id: true, name: true, email: true } } },
+    });
+
+    return res.status(201).json({ comment });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   listProjectTasks,
   listMyTasks,
@@ -502,4 +557,5 @@ module.exports = {
   updateTaskStatus,
   deleteTask,
   listOverdueTasks,
+  addComment,
 };

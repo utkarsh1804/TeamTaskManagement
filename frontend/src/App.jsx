@@ -1,25 +1,35 @@
+import { Suspense, lazy } from "react";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 
 import RequireAuth from "@/components/RequireAuth";
 import AppLayout from "@/components/layout/AppLayout";
-import LoginPage from "@/pages/auth/LoginPage";
-import RegisterPage from "@/pages/auth/RegisterPage";
-import AdminLoginPage from "@/pages/auth/AdminLoginPage";
-import AdminRequestsPage from "@/pages/auth/AdminRequestsPage";
-import InviteAcceptPage from "@/pages/auth/InviteAcceptPage";
-import DashboardPage from "@/pages/dashboard/DashboardPage";
-import ProjectsPage from "@/pages/projects/ProjectsPage";
-import ProjectDetailPage from "@/pages/projects/ProjectDetailPage";
-import MyTasksPage from "@/pages/tasks/MyTasksPage";
-import TaskDetailPage from "@/pages/tasks/TaskDetailPage";
-import MembersPage from "@/pages/members/MembersPage";
-import NotificationsPage from "@/pages/notifications/NotificationsPage";
+import PageSpinner from "@/components/PageSpinner";
+
+const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
+const RegisterPage = lazy(() => import("@/pages/auth/RegisterPage"));
+const AdminLoginPage = lazy(() => import("@/pages/auth/AdminLoginPage"));
+const AdminRequestsPage = lazy(() => import("@/pages/auth/AdminRequestsPage"));
+const InviteAcceptPage = lazy(() => import("@/pages/auth/InviteAcceptPage"));
+const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
+const ProjectsPage = lazy(() => import("@/pages/projects/ProjectsPage"));
+const ProjectDetailPage = lazy(() => import("@/pages/projects/ProjectDetailPage"));
+const MyTasksPage = lazy(() => import("@/pages/tasks/MyTasksPage"));
+const TaskDetailPage = lazy(() => import("@/pages/tasks/TaskDetailPage"));
+const MembersPage = lazy(() => import("@/pages/members/MembersPage"));
+const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
+const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
+
+const wrap = (Page) => (
+  <Suspense fallback={<PageSpinner />}>
+    <Page />
+  </Suspense>
+);
 
 const router = createBrowserRouter([
-  { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/admin-login", element: <AdminLoginPage /> },
-  { path: "/invite/:token", element: <InviteAcceptPage /> },
+  { path: "/login", element: wrap(LoginPage) },
+  { path: "/register", element: wrap(RegisterPage) },
+  { path: "/admin-login", element: wrap(AdminLoginPage) },
+  { path: "/invite/:token", element: wrap(InviteAcceptPage) },
   {
     element: <RequireAuth />,
     children: [
@@ -27,14 +37,15 @@ const router = createBrowserRouter([
         path: "/",
         element: <AppLayout />,
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: "projects", element: <ProjectsPage /> },
-          { path: "projects/:id", element: <ProjectDetailPage /> },
-          { path: "my-tasks", element: <MyTasksPage /> },
-          { path: "tasks/:id", element: <TaskDetailPage /> },
-          { path: "members", element: <MembersPage /> },
-          { path: "notifications", element: <NotificationsPage /> },
-          { path: "admin-requests", element: <AdminRequestsPage /> },
+          { index: true, element: wrap(DashboardPage) },
+          { path: "projects", element: wrap(ProjectsPage) },
+          { path: "projects/:id", element: wrap(ProjectDetailPage) },
+          { path: "my-tasks", element: wrap(MyTasksPage) },
+          { path: "tasks/:id", element: wrap(TaskDetailPage) },
+          { path: "members", element: wrap(MembersPage) },
+          { path: "notifications", element: wrap(NotificationsPage) },
+          { path: "admin-requests", element: wrap(AdminRequestsPage) },
+          { path: "profile", element: wrap(ProfilePage) },
         ],
       },
     ],

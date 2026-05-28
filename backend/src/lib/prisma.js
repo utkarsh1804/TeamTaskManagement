@@ -7,6 +7,7 @@ const SOFT_DELETE_MODELS = new Set([
   "Organization",
   "Department",
   "Team",
+  "Comment",
 ]);
 
 const includeSoftDeleteFilter = (args = {}) => {

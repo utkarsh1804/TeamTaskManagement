@@ -1,15 +1,13 @@
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { format, isBefore, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import api from "@/lib/api";
-import { useAuthStore } from "@/store/authStore";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskExtras from "@/components/tasks/TaskExtras";
+import CommentsThread from "@/components/comments/CommentsThread";
 
 const statusStyles = {
   TODO: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
@@ -48,8 +46,6 @@ const TaskDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
-  const [comment, setComment] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["task", id],
@@ -70,25 +66,8 @@ const TaskDetailPage = () => {
     onError: (err) => toast.error(err?.response?.data?.error || "Failed to update status"),
   });
 
-  const commentMutation = useMutation({
-    mutationFn: (content) => api.post(`/tasks/${id}/comments`, { content }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["task", id] });
-      setComment("");
-      toast.success("Comment added");
-    },
-    onError: (err) => toast.error(err?.response?.data?.error || "Failed to add comment"),
-  });
-
-  const handleCommentSubmit = (e) => {
-    e.preventDefault();
-    if (!comment.trim()) return;
-    commentMutation.mutate(comment.trim());
-  };
-
   const task = data?.task;
   const logs = data?.activityLog || [];
-  const comments = logs.filter((l) => l.entityType === "Comment");
   const activity = logs.filter((l) => l.entityType !== "Comment");
 
   const dueDate = task?.dueDate ? new Date(task.dueDate) : null;
@@ -220,63 +199,7 @@ const TaskDetailPage = () => {
       <TaskExtras taskId={id} orgId={task.project?.orgId} />
 
       {/* Comments */}
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <h2 className="mb-4 text-base font-semibold">
-          Comments{" "}
-          {comments.length > 0 && (
-            <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
-              {comments.length}
-            </span>
-          )}
-        </h2>
-
-        <form onSubmit={handleCommentSubmit} className="mb-5 flex gap-3">
-          <Avatar name={user?.name} size="md" />
-          <div className="flex flex-1 gap-2">
-            <input
-              type="text"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Add a comment…"
-              aria-label="Add a comment"
-              className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={commentMutation.isPending || !comment.trim()}
-              aria-label="Post comment"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </form>
-
-        {comments.length === 0 ? (
-          <p className="text-center text-sm text-muted-foreground py-4">
-            No comments yet. Be the first to comment.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {comments.map((c) => (
-              <div key={c.id} className="flex gap-3">
-                <Avatar name={c.user?.name} size="md" />
-                <div className="flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-medium">{c.user?.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
-                    </span>
-                  </div>
-                  <p className="mt-1 rounded-xl rounded-tl-none bg-muted px-3 py-2 text-sm">
-                    {c.action}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <CommentsThread taskId={id} projectId={task.project?.id} />
 
       {/* Activity log */}
       {activity.length > 0 && (

@@ -9,6 +9,17 @@ import api from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import TaskRow from "@/components/tasks/TaskRow";
 import { Button } from "@/components/ui/button";
+import KanbanBoard from "@/components/views/KanbanBoard";
+import CalendarView from "@/components/views/CalendarView";
+import GanttView from "@/components/views/GanttView";
+import { List, Columns3, Calendar as CalendarIcon, GanttChartSquare } from "lucide-react";
+
+const VIEW_TABS = [
+  { key: "list", label: "List", icon: List },
+  { key: "board", label: "Board", icon: Columns3 },
+  { key: "calendar", label: "Calendar", icon: CalendarIcon },
+  { key: "timeline", label: "Timeline", icon: GanttChartSquare },
+];
 
 const taskSchema = z.object({
   title: z.string().min(2, "Title is required"),
@@ -32,6 +43,7 @@ const ProjectDetailPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [addMsg, setAddMsg] = useState("");
+  const [view, setView] = useState("list");
 
   const { data: projectData } = useQuery({
     queryKey: ["project", id],
@@ -44,7 +56,7 @@ const ProjectDetailPage = () => {
   const { data: tasksData } = useQuery({
     queryKey: ["project-tasks", id],
     queryFn: async () => {
-      const { data } = await api.get(`/projects/${id}/tasks`);
+      const { data } = await api.get(`/projects/${id}/tasks?limit=100`);
       return data;
     },
   });
@@ -60,6 +72,7 @@ const ProjectDetailPage = () => {
 
   const project = projectData?.project;
   const members = project?.members || [];
+  const tasks = tasksData?.items || [];
 
   const isProjectAdmin = useMemo(() => {
     if (!project || !user) return false;
@@ -309,23 +322,48 @@ const ProjectDetailPage = () => {
 
       <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Tasks</h3>
-          {tasksData?.items?.length ? (
-            tasksData.items.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                onStatusChange={(current, status) =>
-                  statusMutation.mutate({ taskId: current.id, status })
-                }
-                onOpen={() => navigate(`/tasks/${task.id}`)}
-              />
-            ))
-          ) : (
-            <div className="rounded-xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
-              No tasks yet.
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-lg font-semibold">Tasks</h3>
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1">
+              {VIEW_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setView(tab.key)}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition ${
+                    view === tab.key
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  <tab.icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
+
+          {view === "list" &&
+            (tasks.length ? (
+              tasks.map((task) => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  onStatusChange={(current, status) =>
+                    statusMutation.mutate({ taskId: current.id, status })
+                  }
+                  onOpen={() => navigate(`/tasks/${task.id}`)}
+                />
+              ))
+            ) : (
+              <div className="rounded-xl border border-dashed border-border bg-card p-4 text-sm text-muted-foreground">
+                No tasks yet.
+              </div>
+            ))}
+
+          {view === "board" && <KanbanBoard projectId={id} tasks={tasks} />}
+          {view === "calendar" && <CalendarView tasks={tasks} />}
+          {view === "timeline" && <GanttView tasks={tasks} />}
         </div>
 
         <div className="space-y-4">

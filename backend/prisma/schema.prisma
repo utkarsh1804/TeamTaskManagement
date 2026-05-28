@@ -1,6 +1,6 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -57,9 +57,9 @@ enum IntegrationType {
 }
 
 model User {
-  id           String         @id @default(uuid())
+  id           String     @id @default(uuid())
   name         String
-  email        String         @unique
+  email        String     @unique
   passwordHash String
   globalRole   GlobalRole
   avatarUrl    String?
@@ -67,7 +67,7 @@ model User {
   phone        String?
   timezone     String?
   departmentId String?
-  createdAt    DateTime       @default(now())
+  createdAt    DateTime   @default(now())
   deletedAt    DateTime?
 
   department            Department?          @relation(fields: [departmentId], references: [id])
@@ -84,6 +84,8 @@ model User {
   createdIntegrations   ProjectIntegration[] @relation("IntegrationCreator")
   uploadedAttachments   Attachment[]         @relation("AttachmentUploader")
   reviewedAdminRequests AdminRequest[]       @relation("AdminReviewer")
+  comments              Comment[]            @relation("CommentAuthor")
+  commentMentions       CommentMention[]
 
   @@index([deletedAt])
   @@index([departmentId])
@@ -151,7 +153,7 @@ model Team {
   departmentId String?
   leaderId     String?
   createdAt    DateTime  @default(now())
-  updatedAt   DateTime   @updatedAt
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   org        Organization @relation(fields: [orgId], references: [id])
@@ -180,22 +182,22 @@ model TeamMember {
 }
 
 model Project {
-  id           String         @id @default(uuid())
+  id           String        @id @default(uuid())
   name         String
   description  String?
-  status       ProjectStatus  @default(ACTIVE)
+  status       ProjectStatus @default(ACTIVE)
   ownerId      String
   orgId        String?
   departmentId String?
   teamId       String?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
 
-  owner        User           @relation("ProjectOwner", fields: [ownerId], references: [id])
-  org          Organization?  @relation(fields: [orgId], references: [id])
-  department   Department?    @relation(fields: [departmentId], references: [id])
-  team         Team?          @relation(fields: [teamId], references: [id])
+  owner        User                 @relation("ProjectOwner", fields: [ownerId], references: [id])
+  org          Organization?        @relation(fields: [orgId], references: [id])
+  department   Department?          @relation(fields: [departmentId], references: [id])
+  team         Team?                @relation(fields: [teamId], references: [id])
   members      ProjectMember[]
   tasks        Task[]
   activityLogs ActivityLog[]
@@ -233,11 +235,12 @@ model Task {
   parent    Task?   @relation("TaskHierarchy", fields: [parentId], references: [id])
   subtasks  Task[]  @relation("TaskHierarchy")
 
-  checklistItems    ChecklistItem[]
-  taskTags          TaskTag[]
-  attachments       Attachment[]
-  blockedBy         TaskDependency[] @relation("BlockedTask")
-  blocking          TaskDependency[] @relation("BlockingTask")
+  checklistItems ChecklistItem[]
+  taskTags       TaskTag[]
+  attachments    Attachment[]
+  blockedBy      TaskDependency[] @relation("BlockedTask")
+  blocking       TaskDependency[] @relation("BlockingTask")
+  comments       Comment[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -432,4 +435,39 @@ model ProjectIntegration {
 
   @@unique([projectId, type])
   @@index([projectId])
+}
+
+model Comment {
+  id        String    @id @default(uuid())
+  taskId    String
+  authorId  String
+  parentId  String?
+  body      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  task     Task             @relation(fields: [taskId], references: [id])
+  author   User             @relation("CommentAuthor", fields: [authorId], references: [id])
+  parent   Comment?         @relation("CommentThread", fields: [parentId], references: [id])
+  replies  Comment[]        @relation("CommentThread")
+  mentions CommentMention[]
+
+  @@index([taskId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([deletedAt])
+}
+
+model CommentMention {
+  id              String   @id @default(uuid())
+  commentId       String
+  mentionedUserId String
+  createdAt       DateTime @default(now())
+
+  comment Comment @relation(fields: [commentId], references: [id])
+  user    User    @relation(fields: [mentionedUserId], references: [id])
+
+  @@unique([commentId, mentionedUserId])
+  @@index([mentionedUserId])
 }

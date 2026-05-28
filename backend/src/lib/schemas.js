@@ -71,6 +71,12 @@ const emailInviteSchema = z.object({
 
 const commentSchema = z.object({
   content: z.string().min(1, "Comment cannot be empty").max(2000, "Comment too long"),
+  parentId: z.string().uuid().optional().nullable(),
+  mentions: z.array(z.string().uuid()).max(50).optional(),
+});
+
+const commentUpdateSchema = z.object({
+  content: z.string().min(1, "Comment cannot be empty").max(2000, "Comment too long"),
 });
 
 const profileUpdateSchema = z.object({
@@ -210,6 +216,7 @@ module.exports = {
   inviteLinkSchema,
   emailInviteSchema,
   commentSchema,
+  commentUpdateSchema,
   profileUpdateSchema,
   passwordUpdateSchema,
 };

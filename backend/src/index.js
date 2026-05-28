@@ -13,6 +13,8 @@ const tasksRoutes = require("./routes/tasks.routes");
 const dashboardRoutes = require("./routes/dashboard.routes");
 const adminRoutes = require("./routes/admin.routes");
 const orgsRoutes = require("./routes/orgs.routes");
+const commentsRoutes = require("./routes/comments.routes");
+const eventsRoutes = require("./routes/events.routes");
 const { startCron } = require("./lib/cron");
 
 const app = express();
@@ -65,6 +67,8 @@ app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/tasks", tasksRoutes);
 app.use("/api/orgs", orgsRoutes);
+app.use("/api/comments", commentsRoutes);
+app.use("/api/events", eventsRoutes);
 app.use("/api", dashboardRoutes);
 app.use("/api/admin", adminRoutes);
 

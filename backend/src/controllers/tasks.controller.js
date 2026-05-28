@@ -2,6 +2,7 @@ const prisma = require("../lib/prisma");
 const { logActivity } = require("../lib/activityLog");
 const { sendTaskAssigned, sendTaskDone } = require("../lib/resend");
 const notifications = require("../lib/notifications");
+const events = require("../lib/events");
 
 const userSelect = {
   id: true,
@@ -58,6 +59,25 @@ const isUserInProject = async (projectId, userId) => {
   return Boolean(membership);
 };
 
+// Fire-and-forget realtime broadcast to every member of a project.
+const emitTaskEvent = (projectId, event, data) => {
+  if (!projectId) return;
+  (async () => {
+    try {
+      const [project, members] = await Promise.all([
+        prisma.project.findUnique({ where: { id: projectId }, select: { ownerId: true } }),
+        prisma.projectMember.findMany({ where: { projectId }, select: { userId: true } }),
+      ]);
+      const ids = new Set();
+      if (project?.ownerId) ids.add(project.ownerId);
+      members.forEach((m) => ids.add(m.userId));
+      events.sendToUsers(Array.from(ids), event, data);
+    } catch (err) {
+      console.error("[events] emitTaskEvent failed:", err);
+    }
+  })();
+};
+
 const listProjectTasks = async (req, res, next) => {
   try {
     const projectId = req.params.id;
@@ -83,6 +103,7 @@ const listProjectTasks = async (req, res, next) => {
           project: { select: { id: true, name: true } },
           assignee: { select: userSelect },
           createdBy: { select: userSelect },
+          blockedBy: { select: { id: true, blockingId: true } },
         },
         orderBy,
         skip,
@@ -207,6 +228,11 @@ const createTask = async (req, res, next) => {
         });
       }
     }
+
+    emitTaskEvent(task.projectId, "task:created", {
+      taskId: task.id,
+      projectId: task.projectId,
+    });
 
     res.status(201).json({ task });
   } catch (error) {
@@ -441,6 +467,11 @@ const updateTask = async (req, res, next) => {
       );
     }
 
+    emitTaskEvent(updated.projectId, "task:updated", {
+      taskId: updated.id,
+      projectId: updated.projectId,
+    });
+
     res.json({ task: updated });
   } catch (error) {
     next(error);
@@ -514,6 +545,11 @@ const updateTaskStatus = async (req, res, next) => {
       });
     }
 
+    emitTaskEvent(updated.projectId, "task:updated", {
+      taskId: updated.id,
+      projectId: updated.projectId,
+    });
+
     res.json({ task: updated });
   } catch (error) {
     next(error);
@@ -553,6 +589,11 @@ const deleteTask = async (req, res, next) => {
     await prisma.task.update({
       where: { id: taskId },
       data: { deletedAt: new Date() },
+    });
+
+    emitTaskEvent(task.projectId, "task:deleted", {
+      taskId: task.id,
+      projectId: task.projectId,
     });
 
     res.json({ success: true });

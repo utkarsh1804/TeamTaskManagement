@@ -19,8 +19,11 @@ const {
   deleteTask,
   listOverdueTasks,
   listMyTasks,
-  addComment,
 } = require("../controllers/tasks.controller");
+const {
+  listComments,
+  createComment,
+} = require("../controllers/comments.controller");
 const {
   listSubtasks,
   listChecklist,
@@ -48,7 +51,8 @@ router.get("/:id", getTask);
 router.patch("/:id", validate(taskUpdateSchema), updateTask);
 router.patch("/:id/status", validate(taskStatusSchema), updateTaskStatus);
 router.delete("/:id", deleteTask);
-router.post("/:id/comments", validate(commentSchema), addComment);
+router.get("/:id/comments", listComments);
+router.post("/:id/comments", validate(commentSchema), createComment);
 
 // Subtasks
 router.get("/:id/subtasks", listSubtasks);

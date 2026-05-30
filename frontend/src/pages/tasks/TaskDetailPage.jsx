@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import api from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import TaskExtras from "@/components/tasks/TaskExtras";
+import TimeTracker from "@/components/tasks/TimeTracker";
 import CommentsThread from "@/components/comments/CommentsThread";
 
 const statusStyles = {
@@ -197,6 +198,9 @@ const TaskDetailPage = () => {
 
       {/* Task extras: checklist, tags, subtasks, dependencies, attachments */}
       <TaskExtras taskId={id} orgId={task.project?.orgId} />
+
+      {/* Time tracking */}
+      <TimeTracker taskId={id} />
 
       {/* Comments */}
       <CommentsThread taskId={id} projectId={task.project?.id} />

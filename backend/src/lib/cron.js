@@ -1,10 +1,62 @@
 const cron = require("node-cron");
 const prisma = require("./prisma");
+const notifications = require("./notifications");
 const { sendDailyReminder } = require("./resend");
 
+const HOUR_MS = 60 * 60 * 1000;
+
+// Scans enabled SLA policies and notifies assignees of tasks past their
+// resolution deadline. De-duplicates via an existing SLA_BREACH notification.
+const runSlaEscalation = async () => {
+  const policies = await prisma.slaPolicy.findMany({ where: { enabled: true } });
+  if (!policies.length) return;
+  const now = new Date();
+  for (const policy of policies) {
+    const tasks = await prisma.task.findMany({
+      where: {
+        projectId: policy.projectId,
+        priority: policy.priority,
+        status: { not: "DONE" },
+        assigneeId: { not: null },
+      },
+      select: { id: true, title: true, createdAt: true, assigneeId: true, projectId: true },
+    });
+    for (const task of tasks) {
+      const deadline = new Date(new Date(task.createdAt).getTime() + policy.resolutionHours * HOUR_MS);
+      if (now <= deadline) continue;
+      const existing = await prisma.notification.findFirst({
+        where: { userId: task.assigneeId, type: "SLA_BREACH", meta: { path: ["taskId"], equals: task.id } },
+      });
+      if (existing) continue;
+      await notifications.create({
+        userId: task.assigneeId,
+        type: notifications.NotificationType.SLA_BREACH,
+        title: "SLA breached",
+        body: `Task "${task.title}" exceeded its ${policy.resolutionHours}h SLA`,
+        link: `/tasks/${task.id}`,
+        meta: { taskId: task.id, projectId: task.projectId, policy: policy.name },
+      });
+    }
+  }
+};
+
 const startCron = () => {
-  if (!process.env.DATABASE_URL || !process.env.RESEND_API_KEY) {
-    console.warn("Cron disabled: missing DATABASE_URL or RESEND_API_KEY.");
+  if (!process.env.DATABASE_URL) {
+    console.warn("Cron disabled: missing DATABASE_URL.");
+    return;
+  }
+
+  // SLA breach escalation — every 30 minutes (DB-only, no email needed).
+  cron.schedule("*/30 * * * *", async () => {
+    try {
+      await runSlaEscalation();
+    } catch (error) {
+      console.error("SLA escalation failed", error);
+    }
+  });
+
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("Email reminders disabled: missing RESEND_API_KEY.");
     return;
   }
 

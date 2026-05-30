@@ -12,13 +12,15 @@ import { Button } from "@/components/ui/button";
 import KanbanBoard from "@/components/views/KanbanBoard";
 import CalendarView from "@/components/views/CalendarView";
 import GanttView from "@/components/views/GanttView";
-import { List, Columns3, Calendar as CalendarIcon, GanttChartSquare } from "lucide-react";
+import SprintsPanel from "@/components/views/SprintsPanel";
+import { List, Columns3, Calendar as CalendarIcon, GanttChartSquare, Rocket } from "lucide-react";
 
 const VIEW_TABS = [
   { key: "list", label: "List", icon: List },
   { key: "board", label: "Board", icon: Columns3 },
   { key: "calendar", label: "Calendar", icon: CalendarIcon },
   { key: "timeline", label: "Timeline", icon: GanttChartSquare },
+  { key: "sprints", label: "Sprints", icon: Rocket },
 ];
 
 const taskSchema = z.object({
@@ -364,6 +366,7 @@ const ProjectDetailPage = () => {
           {view === "board" && <KanbanBoard projectId={id} tasks={tasks} />}
           {view === "calendar" && <CalendarView tasks={tasks} />}
           {view === "timeline" && <GanttView tasks={tasks} />}
+          {view === "sprints" && <SprintsPanel projectId={id} tasks={tasks} isAdmin={isProjectAdmin} />}
         </div>
 
         <div className="space-y-4">

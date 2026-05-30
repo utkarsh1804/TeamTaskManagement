@@ -15,6 +15,7 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(1, "Password is required"),
+  token: z.string().optional(),
 });
 
 const projectCreateSchema = z.object({
@@ -184,6 +185,186 @@ const attachmentCreateSchema = z.object({
   mimeType: z.string().min(1).max(100),
 });
 
+// ===== Phase 4: workforce =====
+const timerStartSchema = z.object({
+  description: z.string().max(500).optional().nullable(),
+});
+
+const manualTimeEntrySchema = z
+  .object({
+    description: z.string().max(500).optional().nullable(),
+    startedAt: z.string().datetime(),
+    endedAt: z.string().datetime().optional().nullable(),
+    durationMinutes: z.number().int().positive().max(24 * 60).optional().nullable(),
+  })
+  .refine((d) => Boolean(d.endedAt) || Boolean(d.durationMinutes), {
+    message: "Provide either endedAt or durationMinutes",
+  });
+
+const timeEntryUpdateSchema = z.object({
+  description: z.string().max(500).optional().nullable(),
+  startedAt: z.string().datetime().optional(),
+  endedAt: z.string().datetime().optional().nullable(),
+  durationMinutes: z.number().int().positive().max(24 * 60).optional().nullable(),
+});
+
+const timesheetSubmitSchema = z.object({
+  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}/, "Invalid week"),
+  note: z.string().max(1000).optional().nullable(),
+});
+
+const timesheetReviewSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]),
+  reviewNote: z.string().max(1000).optional().nullable(),
+});
+
+const skillCreateSchema = z.object({
+  name: z.string().min(1).max(80),
+  category: z.string().max(80).optional().nullable(),
+});
+
+const userSkillSchema = z.object({
+  skillId: z.string().uuid(),
+  level: z.number().int().min(1).max(5),
+});
+
+const leaveCreateSchema = z.object({
+  type: z.enum(["VACATION", "SICK", "PERSONAL", "OTHER"]),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  reason: z.string().max(1000).optional().nullable(),
+});
+
+const leaveReviewSchema = z.object({
+  status: z.enum(["APPROVED", "REJECTED"]),
+  reviewNote: z.string().max(1000).optional().nullable(),
+});
+
+const sprintCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  goal: z.string().max(1000).optional().nullable(),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  status: z.enum(["PLANNED", "ACTIVE", "COMPLETED"]).optional(),
+});
+
+const sprintUpdateSchema = sprintCreateSchema.partial();
+
+const sprintTasksSchema = z.object({
+  taskIds: z.array(z.string().uuid()).max(200),
+});
+
+// ===== Phase 5: workflow & automation =====
+const customFieldCreateSchema = z.object({
+  name: z.string().min(1).max(80),
+  type: z.enum(["TEXT", "NUMBER", "DATE", "SELECT", "CHECKBOX", "URL"]),
+  options: z.array(z.string().max(120)).max(50).optional().nullable(),
+  required: z.boolean().optional(),
+  order: z.number().int().optional(),
+});
+const customFieldUpdateSchema = customFieldCreateSchema.partial();
+const customFieldValueSchema = z.object({
+  value: z.string().max(2000).nullable(),
+});
+
+const templateCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  title: z.string().min(1).max(200),
+  description: z.string().max(5000).optional().nullable(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+  estimatedHours: z.number().nonnegative().max(99999).optional().nullable(),
+  storyPoints: z.number().int().nonnegative().max(999).optional().nullable(),
+  checklist: z.array(z.object({ title: z.string().min(1).max(300) })).max(100).optional().nullable(),
+});
+const templateUpdateSchema = templateCreateSchema.partial();
+const templateInstantiateSchema = z.object({
+  assigneeId: z.string().uuid().optional().nullable(),
+  dueDate: z.string().datetime().optional().nullable(),
+  sprintId: z.string().uuid().optional().nullable(),
+});
+
+const automationActionSchema = z.object({
+  type: z.enum(["SET_STATUS", "SET_PRIORITY", "ASSIGN_USER", "ADD_TAG", "NOTIFY_USER", "SEND_WEBHOOK"]),
+  value: z.string().max(500).optional().nullable(),
+});
+const automationCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  trigger: z.enum(["TASK_CREATED", "TASK_STATUS_CHANGED", "TASK_ASSIGNED", "TASK_PRIORITY_CHANGED"]),
+  conditions: z
+    .object({
+      status: z.enum(["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"]).optional(),
+      priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
+      assigneeId: z.string().uuid().optional(),
+    })
+    .optional()
+    .nullable(),
+  actions: z.array(automationActionSchema).min(1).max(10),
+  enabled: z.boolean().optional(),
+});
+const automationUpdateSchema = automationCreateSchema.partial();
+
+const slaCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
+  responseHours: z.number().int().positive().max(8760).optional().nullable(),
+  resolutionHours: z.number().int().positive().max(8760),
+  enabled: z.boolean().optional(),
+});
+const slaUpdateSchema = slaCreateSchema.partial();
+
+const approvalChainCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  steps: z
+    .array(z.object({ name: z.string().min(1).max(120), approverId: z.string().uuid() }))
+    .min(1)
+    .max(10),
+});
+const approvalRequestCreateSchema = z.object({
+  taskId: z.string().uuid().optional().nullable(),
+  note: z.string().max(1000).optional().nullable(),
+});
+const approvalDecisionSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED"]),
+  note: z.string().max(1000).optional().nullable(),
+});
+
+const savedViewCreateSchema = z.object({
+  projectId: z.string().uuid().optional().nullable(),
+  name: z.string().min(1).max(120),
+  filters: z.record(z.any()),
+  viewType: z.enum(["list", "kanban", "calendar", "gantt"]).optional(),
+  shared: z.boolean().optional(),
+});
+const savedViewUpdateSchema = savedViewCreateSchema.partial();
+
+const bulkTaskSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+  action: z.enum(["status", "priority", "assignee", "sprint", "delete"]),
+  value: z.string().optional().nullable(),
+});
+
+// ===== Phase 6: enterprise & integrations =====
+const apiKeyCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  scopes: z.array(z.enum(["read", "write"])).optional(),
+  expiresAt: z.string().datetime().optional().nullable(),
+});
+
+const twoFactorVerifySchema = z.object({
+  token: z.string().regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+const twoFactorDisableSchema = z.object({
+  password: z.string().min(1, "Password is required"),
+});
+
+const fileUploadSchema = z.object({
+  name: z.string().min(1).max(200),
+  mimeType: z.string().min(1).max(100),
+  dataBase64: z.string().min(1),
+  taskId: z.string().uuid().optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -219,4 +400,36 @@ module.exports = {
   commentUpdateSchema,
   profileUpdateSchema,
   passwordUpdateSchema,
+  timerStartSchema,
+  manualTimeEntrySchema,
+  timeEntryUpdateSchema,
+  timesheetSubmitSchema,
+  timesheetReviewSchema,
+  skillCreateSchema,
+  userSkillSchema,
+  leaveCreateSchema,
+  leaveReviewSchema,
+  sprintCreateSchema,
+  sprintUpdateSchema,
+  sprintTasksSchema,
+  customFieldCreateSchema,
+  customFieldUpdateSchema,
+  customFieldValueSchema,
+  templateCreateSchema,
+  templateUpdateSchema,
+  templateInstantiateSchema,
+  automationCreateSchema,
+  automationUpdateSchema,
+  slaCreateSchema,
+  slaUpdateSchema,
+  approvalChainCreateSchema,
+  approvalRequestCreateSchema,
+  approvalDecisionSchema,
+  savedViewCreateSchema,
+  savedViewUpdateSchema,
+  bulkTaskSchema,
+  apiKeyCreateSchema,
+  twoFactorVerifySchema,
+  twoFactorDisableSchema,
+  fileUploadSchema,
 };

@@ -56,6 +56,33 @@ enum IntegrationType {
   WEBHOOK
 }
 
+enum TimesheetStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum LeaveType {
+  VACATION
+  SICK
+  PERSONAL
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SprintStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+}
+
 model User {
   id           String     @id @default(uuid())
   name         String
@@ -67,6 +94,8 @@ model User {
   phone        String?
   timezone     String?
   departmentId String?
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean    @default(false)
   createdAt    DateTime   @default(now())
   deletedAt    DateTime?
 
@@ -86,6 +115,18 @@ model User {
   reviewedAdminRequests AdminRequest[]       @relation("AdminReviewer")
   comments              Comment[]            @relation("CommentAuthor")
   commentMentions       CommentMention[]
+  timeEntries           TimeEntry[]
+  timesheets            Timesheet[]          @relation("TimesheetOwner")
+  reviewedTimesheets    Timesheet[]          @relation("TimesheetReviewer")
+  userSkills            UserSkill[]
+  leaveRequests         LeaveRequest[]       @relation("LeaveOwner")
+  reviewedLeaves        LeaveRequest[]       @relation("LeaveReviewer")
+  taskTemplates         TaskTemplate[]
+  automationRules       AutomationRule[]
+  approvalRequests      ApprovalRequest[]
+  savedViews            SavedView[]
+  apiKeys               ApiKey[]
+  oauthAccounts         OAuthAccount[]
 
   @@index([deletedAt])
   @@index([departmentId])
@@ -204,6 +245,13 @@ model Project {
   inviteLinks  InviteLink[]
   integrations ProjectIntegration[]
   attachments  Attachment[]
+  sprints      Sprint[]
+  customFields    CustomField[]
+  taskTemplates   TaskTemplate[]
+  automationRules AutomationRule[]
+  slaPolicies     SlaPolicy[]
+  approvalChains  ApprovalChain[]
+  savedViews      SavedView[]
 
   @@index([ownerId])
   @@index([orgId])
@@ -228,6 +276,7 @@ model Task {
   assigneeId     String?
   createdById    String
   parentId       String?
+  sprintId       String?
 
   project   Project @relation(fields: [projectId], references: [id])
   assignee  User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
@@ -241,6 +290,10 @@ model Task {
   blockedBy      TaskDependency[] @relation("BlockedTask")
   blocking       TaskDependency[] @relation("BlockingTask")
   comments       Comment[]
+  sprint         Sprint?          @relation(fields: [sprintId], references: [id])
+  timeEntries    TimeEntry[]
+  customFieldValues CustomFieldValue[]
+  approvalRequests  ApprovalRequest[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -251,6 +304,7 @@ model Task {
   @@index([status])
   @@index([projectId, status])
   @@index([parentId])
+  @@index([sprintId])
   @@index([deletedAt])
 }
 
@@ -430,8 +484,9 @@ model ProjectIntegration {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id])
-  createdBy User    @relation("IntegrationCreator", fields: [createdById], references: [id])
+  project    Project           @relation(fields: [projectId], references: [id])
+  createdBy  User              @relation("IntegrationCreator", fields: [createdById], references: [id])
+  deliveries WebhookDelivery[]
 
   @@unique([projectId, type])
   @@index([projectId])
@@ -470,4 +525,334 @@ model CommentMention {
 
   @@unique([commentId, mentionedUserId])
   @@index([mentionedUserId])
+}
+
+model TimeEntry {
+  id              String    @id @default(uuid())
+  taskId          String
+  userId          String
+  description     String?
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMinutes Int?
+  source          String    @default("TIMER")
+  timesheetId     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  task      Task       @relation(fields: [taskId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  timesheet Timesheet? @relation(fields: [timesheetId], references: [id])
+
+  @@index([userId])
+  @@index([taskId])
+  @@index([timesheetId])
+  @@index([deletedAt])
+}
+
+model Timesheet {
+  id           String          @id @default(uuid())
+  userId       String
+  weekStart    DateTime
+  status       TimesheetStatus @default(DRAFT)
+  note         String?
+  submittedAt  DateTime?
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user       User        @relation("TimesheetOwner", fields: [userId], references: [id])
+  reviewedBy User?       @relation("TimesheetReviewer", fields: [reviewedById], references: [id])
+  entries    TimeEntry[]
+
+  @@unique([userId, weekStart])
+  @@index([userId])
+  @@index([status])
+}
+
+model Skill {
+  id        String      @id @default(uuid())
+  name      String      @unique
+  category  String?
+  createdAt DateTime    @default(now())
+
+  userSkills UserSkill[]
+}
+
+model UserSkill {
+  id        String   @id @default(uuid())
+  userId    String
+  skillId   String
+  level     Int      @default(3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id])
+  skill Skill @relation(fields: [skillId], references: [id])
+
+  @@unique([userId, skillId])
+  @@index([userId])
+  @@index([skillId])
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid())
+  userId       String
+  type         LeaveType   @default(VACATION)
+  startDate    DateTime
+  endDate      DateTime
+  reason       String?
+  status       LeaveStatus @default(PENDING)
+  reviewedById String?
+  reviewedAt   DateTime?
+  reviewNote   String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user       User  @relation("LeaveOwner", fields: [userId], references: [id])
+  reviewedBy User? @relation("LeaveReviewer", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Sprint {
+  id        String       @id @default(uuid())
+  projectId String
+  name      String
+  goal      String?
+  startDate DateTime
+  endDate   DateTime
+  status    SprintStatus @default(PLANNED)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  project Project @relation(fields: [projectId], references: [id])
+  tasks   Task[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+// ============================================================
+// Phase 5 — Workflow & Automation
+// ============================================================
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+  CHECKBOX
+  URL
+}
+
+enum AutomationTrigger {
+  TASK_CREATED
+  TASK_STATUS_CHANGED
+  TASK_ASSIGNED
+  TASK_PRIORITY_CHANGED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model CustomField {
+  id        String          @id @default(uuid())
+  projectId String
+  name      String
+  type      CustomFieldType @default(TEXT)
+  options   Json?
+  required  Boolean         @default(false)
+  order     Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  project Project            @relation(fields: [projectId], references: [id])
+  values  CustomFieldValue[]
+
+  @@index([projectId])
+}
+
+model CustomFieldValue {
+  id      String  @id @default(uuid())
+  fieldId String
+  taskId  String
+  value   String?
+
+  field CustomField @relation(fields: [fieldId], references: [id])
+  task  Task        @relation(fields: [taskId], references: [id])
+
+  @@unique([fieldId, taskId])
+  @@index([taskId])
+  @@index([fieldId])
+}
+
+model TaskTemplate {
+  id             String   @id @default(uuid())
+  projectId      String
+  name           String
+  title          String
+  description    String?
+  priority       Priority @default(MEDIUM)
+  estimatedHours Decimal? @db.Decimal(6, 2)
+  storyPoints    Int?
+  checklist      Json?
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([projectId])
+}
+
+model AutomationRule {
+  id          String            @id @default(uuid())
+  projectId   String
+  name        String
+  trigger     AutomationTrigger
+  conditions  Json?
+  actions     Json
+  enabled     Boolean           @default(true)
+  runCount    Int               @default(0)
+  lastRunAt   DateTime?
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([projectId])
+}
+
+model SlaPolicy {
+  id              String   @id @default(uuid())
+  projectId       String
+  name            String
+  priority        Priority
+  responseHours   Int?
+  resolutionHours Int
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, priority])
+  @@index([projectId])
+}
+
+model ApprovalChain {
+  id        String   @id @default(uuid())
+  projectId String
+  name      String
+  steps     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project           @relation(fields: [projectId], references: [id])
+  requests ApprovalRequest[]
+
+  @@index([projectId])
+}
+
+model ApprovalRequest {
+  id            String         @id @default(uuid())
+  chainId       String
+  taskId        String?
+  requestedById String
+  status        ApprovalStatus @default(PENDING)
+  currentStep   Int            @default(0)
+  steps         Json
+  note          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  chain       ApprovalChain @relation(fields: [chainId], references: [id])
+  task        Task?         @relation(fields: [taskId], references: [id])
+  requestedBy User          @relation(fields: [requestedById], references: [id])
+
+  @@index([chainId])
+  @@index([taskId])
+  @@index([requestedById])
+}
+
+model SavedView {
+  id        String   @id @default(uuid())
+  projectId String?
+  ownerId   String
+  name      String
+  filters   Json
+  viewType  String   @default("list")
+  shared    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project? @relation(fields: [projectId], references: [id])
+  owner   User     @relation(fields: [ownerId], references: [id])
+
+  @@index([projectId])
+  @@index([ownerId])
+}
+
+// ============================================================
+// Phase 6 — Enterprise & Integrations
+// ============================================================
+
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String
+  name       String
+  keyHash    String    @unique
+  prefix     String
+  scopes     Json?
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model OAuthAccount {
+  id             String   @id @default(uuid())
+  userId         String
+  provider       String
+  providerUserId String
+  email          String?
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+}
+
+model WebhookDelivery {
+  id            String   @id @default(uuid())
+  integrationId String
+  event         String
+  payload       Json
+  statusCode    Int?
+  success       Boolean  @default(false)
+  error         String?
+  createdAt     DateTime @default(now())
+
+  integration ProjectIntegration @relation(fields: [integrationId], references: [id])
+
+  @@index([integrationId])
+  @@index([createdAt])
 }

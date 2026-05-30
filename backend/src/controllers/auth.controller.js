@@ -99,6 +99,18 @@ const login = async (req, res, next) => {
       });
     }
 
+    if (userWithPassword.twoFactorEnabled) {
+      const totp = require("../lib/totp");
+      if (!req.body.token) {
+        return res.status(200).json({ twoFactorRequired: true });
+      }
+      if (!totp.verify(userWithPassword.twoFactorSecret, req.body.token)) {
+        return res
+          .status(401)
+          .json({ success: false, error: "Invalid two-factor code", code: "INVALID_2FA" });
+      }
+    }
+
     const user = await prisma.user.findUnique({ where: { email }, select: userSelect });
     const { accessToken, refreshToken } = await issueTokens(user, req);
     setAuthCookies(res, { accessToken, refreshToken });

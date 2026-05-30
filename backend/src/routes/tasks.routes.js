@@ -11,6 +11,7 @@ const {
   taskTagSchema,
   dependencyCreateSchema,
   attachmentCreateSchema,
+  bulkTaskSchema,
 } = require("../lib/schemas");
 const {
   getTask,
@@ -19,6 +20,7 @@ const {
   deleteTask,
   listOverdueTasks,
   listMyTasks,
+  bulkUpdate,
 } = require("../controllers/tasks.controller");
 const {
   listComments,
@@ -47,6 +49,7 @@ router.use(authMiddleware);
 
 router.get("/", listMyTasks);
 router.get("/overdue", listOverdueTasks);
+router.post("/bulk", validate(bulkTaskSchema), bulkUpdate);
 router.get("/:id", getTask);
 router.patch("/:id", validate(taskUpdateSchema), updateTask);
 router.patch("/:id/status", validate(taskStatusSchema), updateTaskStatus);

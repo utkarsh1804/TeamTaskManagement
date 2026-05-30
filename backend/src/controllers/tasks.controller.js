@@ -3,6 +3,39 @@ const { logActivity } = require("../lib/activityLog");
 const { sendTaskAssigned, sendTaskDone } = require("../lib/resend");
 const notifications = require("../lib/notifications");
 const events = require("../lib/events");
+const { runAutomations } = require("../lib/automation");
+
+const addRecurrence = (rule, from) => {
+  const d = new Date(from);
+  const r = String(rule || "").toUpperCase();
+  if (r.includes("DAI")) d.setUTCDate(d.getUTCDate() + 1);
+  else if (r.includes("WEEK")) d.setUTCDate(d.getUTCDate() + 7);
+  else if (r.includes("MONTH")) d.setUTCMonth(d.getUTCMonth() + 1);
+  else if (r.includes("YEAR")) d.setUTCFullYear(d.getUTCFullYear() + 1);
+  else return null;
+  return d;
+};
+
+const createNextRecurrence = async (task) => {
+  const base = task.dueDate ? new Date(task.dueDate) : new Date();
+  const nextDue = addRecurrence(task.recurrenceRule, base);
+  if (!nextDue) return null;
+  return prisma.task.create({
+    data: {
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      estimatedHours: task.estimatedHours,
+      storyPoints: task.storyPoints,
+      recurrenceRule: task.recurrenceRule,
+      projectId: task.projectId,
+      assigneeId: task.assigneeId,
+      createdById: task.createdById,
+      dueDate: nextDue,
+      status: "TODO",
+    },
+  });
+};
 
 const userSelect = {
   id: true,
@@ -229,12 +262,22 @@ const createTask = async (req, res, next) => {
       }
     }
 
+    await runAutomations("TASK_CREATED", task);
+    const fresh = await prisma.task.findUnique({
+      where: { id: task.id },
+      include: {
+        project: { select: { id: true, name: true } },
+        assignee: { select: userSelect },
+        createdBy: { select: userSelect },
+      },
+    });
+
     emitTaskEvent(task.projectId, "task:created", {
       taskId: task.id,
       projectId: task.projectId,
     });
 
-    res.status(201).json({ task });
+    res.status(201).json({ task: fresh || task });
   } catch (error) {
     next(error);
   }
@@ -545,12 +588,20 @@ const updateTaskStatus = async (req, res, next) => {
       });
     }
 
-    emitTaskEvent(updated.projectId, "task:updated", {
-      taskId: updated.id,
-      projectId: updated.projectId,
+    if (status === "DONE" && task.recurrenceRule) {
+      await createNextRecurrence(task);
+    }
+
+    let finalTask = updated;
+    const automated = await runAutomations("TASK_STATUS_CHANGED", updated);
+    if (automated) finalTask = automated;
+
+    emitTaskEvent(finalTask.projectId, "task:updated", {
+      taskId: finalTask.id,
+      projectId: finalTask.projectId,
     });
 
-    res.json({ task: updated });
+    res.json({ task: finalTask });
   } catch (error) {
     next(error);
   }
@@ -727,6 +778,55 @@ const addComment = async (req, res, next) => {
   }
 };
 
+const bulkUpdate = async (req, res, next) => {
+  try {
+    const { ids, action, value } = req.body;
+    const tasks = await prisma.task.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, projectId: true },
+    });
+    if (!tasks.length) {
+      return res.status(404).json({ success: false, error: "No tasks found", code: "NOT_FOUND" });
+    }
+
+    const projectIds = [...new Set(tasks.map((t) => t.projectId))];
+    for (const pid of projectIds) {
+      const access = await getProjectAccess(pid, req.user.id, req.user.globalRole);
+      if (!access.isMember) {
+        return res.status(403).json({ success: false, error: "Forbidden", code: "FORBIDDEN" });
+      }
+    }
+
+    const validIds = tasks.map((t) => t.id);
+    let count = 0;
+    if (action === "delete") {
+      const r = await prisma.task.updateMany({
+        where: { id: { in: validIds } },
+        data: { deletedAt: new Date() },
+      });
+      count = r.count;
+    } else {
+      const data = {};
+      if (action === "status") data.status = value;
+      else if (action === "priority") data.priority = value;
+      else if (action === "assignee") data.assigneeId = value || null;
+      else if (action === "sprint") data.sprintId = value || null;
+      if (!Object.keys(data).length) {
+        return res.status(400).json({ success: false, error: "Invalid bulk action", code: "BAD_REQUEST" });
+      }
+      const r = await prisma.task.updateMany({ where: { id: { in: validIds } }, data });
+      count = r.count;
+    }
+
+    for (const pid of projectIds) {
+      emitTaskEvent(pid, "task:updated", { bulk: true, projectId: pid });
+    }
+    res.json({ success: true, count });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   listProjectTasks,
   listMyTasks,
@@ -737,4 +837,5 @@ module.exports = {
   deleteTask,
   listOverdueTasks,
   addComment,
+  bulkUpdate,
 };

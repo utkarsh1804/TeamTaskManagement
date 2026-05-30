@@ -12,6 +12,10 @@ import {
   UserCircle,
   Building2,
   Activity,
+  Clock,
+  Plane,
+  GraduationCap,
+  Gauge,
 } from "lucide-react";
 
 import api from "@/lib/api";
@@ -29,6 +33,10 @@ const Sidebar = () => {
     { to: "/", label: "Dashboard", icon: LayoutGrid },
     { to: "/projects", label: "Projects", icon: FolderOpen },
     { to: "/my-tasks", label: "My Tasks", icon: CheckCircle2 },
+    { to: "/timesheets", label: "Timesheets", icon: Clock },
+    { to: "/leave", label: "Leave", icon: Plane },
+    { to: "/skills", label: "Skills", icon: GraduationCap },
+    { to: "/capacity", label: "Capacity", icon: Gauge },
     { to: "/orgs", label: "Organizations", icon: Building2 },
     { to: "/members", label: "Members", icon: Users },
     { to: "/notifications", label: "Notifications", icon: Bell },

@@ -21,6 +21,10 @@ const ProfilePage = lazy(() => import("@/pages/profile/ProfilePage"));
 const OrgsPage = lazy(() => import("@/pages/orgs/OrgsPage"));
 const OrgDetailPage = lazy(() => import("@/pages/orgs/OrgDetailPage"));
 const AuditLogPage = lazy(() => import("@/pages/audit/AuditLogPage"));
+const TimesheetsPage = lazy(() => import("@/pages/timesheets/TimesheetsPage"));
+const SkillsPage = lazy(() => import("@/pages/skills/SkillsPage"));
+const LeavePage = lazy(() => import("@/pages/leave/LeavePage"));
+const CapacityPage = lazy(() => import("@/pages/capacity/CapacityPage"));
 
 const wrap = (Page) => (
   <Suspense fallback={<PageSpinner />}>
@@ -51,6 +55,10 @@ const router = createBrowserRouter([
           { path: "profile", element: wrap(ProfilePage) },
           { path: "orgs", element: wrap(OrgsPage) },
           { path: "orgs/:id", element: wrap(OrgDetailPage) },
+          { path: "timesheets", element: wrap(TimesheetsPage) },
+          { path: "skills", element: wrap(SkillsPage) },
+          { path: "leave", element: wrap(LeavePage) },
+          { path: "capacity", element: wrap(CapacityPage) },
           { path: "audit-log", element: wrap(AuditLogPage) },
         ],
       },

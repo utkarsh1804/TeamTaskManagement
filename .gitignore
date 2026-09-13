@@ -21,3 +21,4 @@ coverage/
 .sisyphus/
 .playwright-mcp/
 .sixth/
+.sisyphus/run-continuation

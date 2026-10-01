@@ -5,7 +5,8 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "node --env-file=.env --watch src/index.js",
-    "start": "node src/index.js",
+    "build": "prisma generate",
+    "start": "npx prisma migrate deploy && node src/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",

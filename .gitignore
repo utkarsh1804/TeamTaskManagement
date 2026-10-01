@@ -22,3 +22,4 @@ coverage/
 .playwright-mcp/
 .sixth/
 .sisyphus/run-continuation
+.neon

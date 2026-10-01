@@ -48,8 +48,21 @@ app.use((req, res, next) =>
 app.use(cookieParser());
 app.use(morgan("dev"));
 
-const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-app.use(cors({ origin: frontendUrl, credentials: true }));
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true
+}));
 
 app.use((req, _res, next) => {
   req.requestId = crypto.randomUUID();
